@@ -4,12 +4,14 @@ url = "https://pypi.org/simple"
 verify_ssl = true
 
 [dev-packages]
+jupyter = "*"
 
 [packages]
 tensorflow = "==1.15"
 scipy = "*"
 requests = "*"
 pillow = "*"
+pandas = "*"
 
 [requires]
 python_version = "3.7"

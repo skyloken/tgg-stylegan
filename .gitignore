@@ -130,7 +130,7 @@ dmypy.json
 
 # Project
 /results/
-/dataset/
+/datasets/
 /data/
 /cache/
 /outputs/

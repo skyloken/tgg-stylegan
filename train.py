@@ -18,8 +18,10 @@ from metrics import metric_base
 # Official training configs for StyleGAN, targeted mainly for FFHQ.
 
 if 1:
-    desc          = 'sgan'                                                                 # Description string included in result subdir name.
-    train         = EasyDict(run_func_name='training.training_loop.training_loop')         # Options for training loop.
+    desc          = 'sgan'                                                             # Description string included in result subdir name.
+    # train         = EasyDict(run_func_name='training.training_loop.training_loop')         # Options for training loop.
+    train         = EasyDict(run_func_name='training.training_loop.training_loop', network_snapshot_ticks=2, resume_run_id='latest')         # Options for training loop.
+    # train         = EasyDict(run_func_name='training.training_loop.training_loop', network_snapshot_ticks=2, resume_run_id=24, resume_kimg=4941)         # Options for training loop.
     G             = EasyDict(func_name='training.networks_stylegan.G_style')               # Options for generator network.
     D             = EasyDict(func_name='training.networks_stylegan.D_basic')               # Options for discriminator network.
     G_opt         = EasyDict(beta1=0.0, beta2=0.99, epsilon=1e-8)                          # Options for generator optimizer.
@@ -29,19 +31,23 @@ if 1:
     dataset       = EasyDict()                                                             # Options for load_dataset().
     sched         = EasyDict()                                                             # Options for TrainingSchedule.
     grid          = EasyDict(size='4k', layout='random')                                   # Options for setup_snapshot_image_grid().
-    metrics       = [metric_base.fid50k]                                                   # Options for MetricGroup.
+    # metrics       = [metric_base.fid50k]                                                   # Options for MetricGroup.
+    metrics       = []
     submit_config = dnnlib.SubmitConfig()                                                  # Options for dnnlib.submit_run().
     tf_config     = {'rnd.np_random_seed': 1000}                                           # Options for tflib.init_tf().
 
     # Dataset.
-    desc += '-logos';     dataset = EasyDict(tfrecord_dir='no_conditions', resolution=128);
+    # desc += '-logos';     dataset = EasyDict(tfrecord_dir='no_conditions', resolution=128);
+    desc += '-wallpaper256';     dataset = EasyDict(tfrecord_dir='wallpaper_256', resolution=256);    train.mirror_augment = True
+    # desc += '-wallpaper_color256';     dataset = EasyDict(tfrecord_dir='wallpaper_color_256', resolution=256);    train.mirror_augment = True
+
 
     # Number of GPUs.
     desc += '-1gpu'; submit_config.num_gpus = 1; sched.minibatch_base = 4; sched.minibatch_dict = {4: 128, 8: 128, 16: 128, 32: 64, 64: 32, 128: 16, 256: 8, 512: 4}
 
     # Default options.
     train.total_kimg = 20000
-    sched.lod_initial_resolution = 4
+    sched.lod_initial_resolution = 8
     sched.G_lrate_dict = {128: 0.0015, 256: 0.002, 512: 0.003, 1024: 0.003}
     sched.D_lrate_dict = EasyDict(sched.G_lrate_dict)
 

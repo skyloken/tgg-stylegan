@@ -293,11 +293,11 @@ def unpickle(file):
     return dict
 
 
-def create_from_images(tfrecord_dir, image_dir, shuffle, add_condition):
+def create_from_images(tfrecord_dir, image_dir, shuffle, add_condition, label_file):
     print("ADD CONDITION ", add_condition)
     print('Loading images from "%s"' % image_dir)
 
-    all_data = unpickle('../data/mypickle.pickle')
+    all_data = unpickle(label_file)
     image_filenames_temp = all_data["Filenames"]
     conditions_all = all_data["Labels"] #for others use Clusters
     assert len(conditions_all) == len(image_filenames_temp)
@@ -460,6 +460,7 @@ def execute_cmdline(argv):
     p.add_argument(     'image_dir',        help='Directory containing the images')
     p.add_argument(     '--shuffle',        help='Randomize image order (default: 1)', type=int, default=1)
     p.add_argument(     'add_condition', help='1 if include labels', type=int, default=0)
+    p.add_argument(     'label_file',        help='Label pickle file')
 
     p = add_command(    'create_from_hdf5', 'Create dataset from legacy HDF5 archive.',
                                             'create_from_hdf5 datasets/celebahq ~/downloads/celeba-hq-1024x1024.h5')
