@@ -46,7 +46,7 @@ class TFRecordDataset:
         buffer_mb       = 256,      # Read buffer size (megabytes).
         num_threads     = 2):       # Number of concurrent threads.
 
-        self.tfrecord_dir       = 'dataset/logos'
+        self.tfrecord_dir       = tfrecord_dir
         self.resolution         = None
         self.resolution_log2    = None
         self.shape              = []        # [channel, height, width]

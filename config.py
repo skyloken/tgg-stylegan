@@ -13,9 +13,9 @@
 result_dir = 'results'
 output_dir = 'outputs'
 data_dir = 'datasets'
-# result_dir = '/content/drive/My\ Drive/colab_work/tgg-stylegan/results'
-# output_dir = '/content/drive/My\ Drive/colab_work/tgg-stylegan/outputs'
-# data_dir = '/content/drive/My\ Drive/colab_work/tgg-stylegan/datasets'
+# result_dir = '/content/drive/My Drive/colab_work/tgg-stylegan/results'
+# output_dir = '/content/drive/My Drive/colab_work/tgg-stylegan/outputs'
+# data_dir = '/content/drive/My Drive/colab_work/tgg-stylegan/datasets'
 cache_dir = 'cache'
 run_dir_ignore = ['results', 'dataset', 'cache', 'outputs']
 
