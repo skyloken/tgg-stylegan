@@ -234,6 +234,7 @@ def G_tgg(G, D, opt, training_set, minibatch_size):  # pylint: disable=unused-ar
     loss += tf.nn.softplus(-mixed_jpn_scores_out)
     return loss
 
+
 def G_tgg2(G, D, opt, training_set, minibatch_size):  # pylint: disable=unused-argument
 
     # Basic Generator Loss
@@ -251,9 +252,29 @@ def G_tgg2(G, D, opt, training_set, minibatch_size):  # pylint: disable=unused-a
     jpn_dlatents = G.components.mapping.get_output_for(jpn_latents, jpn_labels, is_training=True)
     mixed_dlatents = mix_dlatents(wst_dlatents, jpn_dlatents)
     mixed_images_out = G.components.synthesis.get_output_for(mixed_dlatents, is_training=True)
-    mixed_scores_out = fp32(D.get_output_for(mixed_images_out, tf.ones([minibatch_size, 2], dtype=tf.int32), is_training=True))
+    mixed_scores_out = fp32(
+        D.get_output_for(mixed_images_out, tf.ones([minibatch_size, 2], dtype=tf.int32), is_training=True))
 
     # Loss
     loss = tf.nn.softplus(-fake_scores_out)  # -log(logistic(fake_scores_out))
     loss += tf.nn.softplus(-mixed_scores_out)
+    return loss
+
+
+def G_tgg3(G, D, opt, training_set, minibatch_size):  # pylint: disable=unused-argument
+
+    latents = tf.random_normal([minibatch_size] + G.input_shapes[0][1:])
+
+    # Basic Generator Loss
+    # labels = training_set.get_random_labels_tf(minibatch_size)
+    # fake_images_out = G.get_output_for(latents, labels, is_training=True)
+    # fake_scores_out = fp32(D.get_output_for(fake_images_out, labels, is_training=True))
+
+    # Western-Japanese Loss
+    wj_labels = tf.ones([minibatch_size, 2], dtype=tf.int32)
+    wj_fake_images_out = G.get_output_for(latents, wj_labels, is_training=True)
+    wj_fake_scores_out = fp32(D.get_output_for(wj_fake_images_out, wj_labels, is_training=True))
+
+    loss = tf.nn.softplus(-wj_fake_scores_out)  # -log(logistic(fake_scores_out))
+
     return loss
