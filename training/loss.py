@@ -233,3 +233,27 @@ def G_tgg(G, D, opt, training_set, minibatch_size):  # pylint: disable=unused-ar
     loss += tf.nn.softplus(-mixed_wst_scores_out)
     loss += tf.nn.softplus(-mixed_jpn_scores_out)
     return loss
+
+def G_tgg2(G, D, opt, training_set, minibatch_size):  # pylint: disable=unused-argument
+
+    # Basic Generator Loss
+    half_minibatch_size = minibatch_size // 2
+    wst_latents = tf.random_normal([half_minibatch_size] + G.input_shapes[0][1:])
+    wst_labels = tf.one_hot(tf.fill([half_minibatch_size], 0), 2, dtype=tf.int32)
+    jpn_latents = tf.random_normal([half_minibatch_size] + G.input_shapes[0][1:])
+    jpn_labels = tf.one_hot(tf.fill([half_minibatch_size], 1), 2, dtype=tf.int32)
+    fake_images_out = G.get_output_for(tf.concat([wst_latents, jpn_latents], 0), tf.concat([wst_labels, jpn_labels], 0),
+                                       is_training=True)
+    fake_scores_out = fp32(D.get_output_for(fake_images_out, tf.concat([wst_labels, jpn_labels], 0), is_training=True))
+
+    # Western and Japanese Mixing Loss
+    wst_dlatents = G.components.mapping.get_output_for(wst_latents, wst_labels, is_training=True)
+    jpn_dlatents = G.components.mapping.get_output_for(jpn_latents, jpn_labels, is_training=True)
+    mixed_dlatents = mix_dlatents(wst_dlatents, jpn_dlatents)
+    mixed_images_out = G.components.synthesis.get_output_for(mixed_dlatents, is_training=True)
+    mixed_scores_out = fp32(D.get_output_for(mixed_images_out, tf.ones([minibatch_size, 2], dtype=tf.int32), is_training=True))
+
+    # Loss
+    loss = tf.nn.softplus(-fake_scores_out)  # -log(logistic(fake_scores_out))
+    loss += tf.nn.softplus(-mixed_scores_out)
+    return loss
