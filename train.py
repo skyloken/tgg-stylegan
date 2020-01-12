@@ -17,11 +17,10 @@ from metrics import metric_base
 # ----------------------------------------------------------------------------
 # Official training configs for StyleGAN, targeted mainly for FFHQ.
 
-if 0:
+if 1:
     desc = 'sgan'  # Description string included in result subdir name.
-    # train         = EasyDict(run_func_name='training.training_loop.training_loop')         # Options for training loop.
-    train = EasyDict(run_func_name='training.training_loop.training_loop', network_snapshot_ticks=2,
-                     resume_run_id='latest')  # Options for training loop.
+    train         = EasyDict(run_func_name='training.training_loop.training_loop')         # Options for training loop.
+    # train = EasyDict(run_func_name='training.training_loop.training_loop', network_snapshot_ticks=2, resume_run_id='latest')  # Options for training loop.
     # train         = EasyDict(run_func_name='training.training_loop.training_loop', network_snapshot_ticks=2, resume_run_id=24, resume_kimg=4941)         # Options for training loop.
     G = EasyDict(func_name='training.networks_stylegan.G_style')  # Options for generator network.
     D = EasyDict(func_name='training.networks_stylegan.D_basic')  # Options for discriminator network.
@@ -39,8 +38,8 @@ if 0:
 
     # Dataset.
     # desc += '-logos';     dataset = EasyDict(tfrecord_dir='no_conditions', resolution=128);
-    desc += '-wallpaper256';
-    dataset = EasyDict(tfrecord_dir='wallpaper_256', resolution=256);
+    # desc += '-wallpaper256';dataset = EasyDict(tfrecord_dir='wallpaper_256', resolution=256);
+    desc += '-wallpaper2_256';dataset = EasyDict(tfrecord_dir='wallpaper2_256', resolution=256);
     train.mirror_augment = True
 
     # Number of GPUs.
@@ -50,7 +49,7 @@ if 0:
     sched.minibatch_dict = {4: 128, 8: 128, 16: 128, 32: 64, 64: 32, 128: 16, 256: 8, 512: 4}
 
     # Default options.
-    train.total_kimg = 20000
+    train.total_kimg = 30000
     sched.lod_initial_resolution = 8
     sched.G_lrate_dict = {128: 0.0015, 256: 0.002, 512: 0.003, 1024: 0.003}
     sched.D_lrate_dict = EasyDict(sched.G_lrate_dict)
@@ -61,9 +60,9 @@ if 0:
 # ----------------------------------------------------------------------------
 # Training configs for Takeda Goichi Generator
 
-if 1:
+if 0:
     desc = 'tgg-sgan'  # Description string included in result subdir name.
-    train = EasyDict(run_func_name='training.training_loop.training_loop', save_style_mixing_image=True)  # Options for training loop.
+    # train = EasyDict(run_func_name='training.training_loop.training_loop', save_style_mixing_image=True)  # Options for training loop.
     train = EasyDict(run_func_name='training.training_loop.training_loop', save_style_mixing_image=True, resume_run_id=1, resume_kimg=30000)  # Options for training loop.
     # train = EasyDict(run_func_name='training.training_loop.training_loop', network_snapshot_ticks=2, resume_run_id='latest')  # Options for training loop.
     # train = EasyDict(run_func_name='training.training_loop.training_loop', network_snapshot_ticks=2, resume_run_id=24, resume_kimg=4941)  # Options for training loop.
@@ -71,7 +70,7 @@ if 1:
     D = EasyDict(func_name='training.networks_stylegan.D_basic')  # Options for discriminator network.
     G_opt = EasyDict(beta1=0.0, beta2=0.99, epsilon=1e-8)  # Options for generator optimizer.
     D_opt = EasyDict(beta1=0.0, beta2=0.99, epsilon=1e-8)  # Options for discriminator optimizer.
-    G_loss = EasyDict(func_name='training.loss.G_tgg2')  # Options for generator loss.
+    G_loss = EasyDict(func_name='training.loss.G_tgg3')  # Options for generator loss.
     D_loss = EasyDict(func_name='training.loss.D_logistic_simplegp', r1_gamma=10.0)  # Options for discriminator loss.
     dataset = EasyDict()  # Options for load_dataset().
     sched = EasyDict()  # Options for TrainingSchedule.

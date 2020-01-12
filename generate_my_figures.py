@@ -8,7 +8,7 @@ import config
 from training import misc
 from generate_figures import *
 
-run_id = 31
+run_id = 1
 snapshot = None
 width = 256
 height = 256
@@ -55,6 +55,26 @@ def generate_figures(Gs):
         png_filename = os.path.join(config.output_dir, 'gen_japanese_images', 'gen_%s.png' % i)
         PIL.Image.fromarray(images[0], 'RGB').save(png_filename)
 
+def generate_wj_figures(Gs):
+
+    # Generate western images
+    for i in range(250):
+        # Pick latent vector.
+        # latents = np.random.RandomState(i).randn(1, Gs.input_shape[1])
+        latents = np.stack([np.random.RandomState(i).randn(Gs.input_shape[1])])
+        dlatents = Gs.components.mapping.run(latents, [[1, 1]])
+
+        # Generate image.
+        fmt = dict(func=tflib.convert_images_to_uint8, nchw_to_nhwc=True)
+        # images = Gs.run(latents, [[1, 0]], randomize_noise=False, output_transform=fmt)
+        images = Gs.components.synthesis.run(dlatents, randomize_noise=False, **synthesis_kwargs)
+
+        # Save image.
+        os.makedirs(config.output_dir, exist_ok=True)
+        os.makedirs(os.path.join(config.output_dir, 'gen_wj_images'), exist_ok=True)
+        png_filename = os.path.join(config.output_dir, 'gen_wj_images', 'gen_%s.png' % i)
+        PIL.Image.fromarray(images[0], 'RGB').save(png_filename)
+
 def draw_color_conditions(Gs, src_seed, label):
     src_latents = np.random.RandomState(src_seed).randn(1, Gs.input_shape[1])
     src_dlatents = Gs.components.mapping.run(src_latents, [label])
@@ -94,10 +114,11 @@ def main():
     # Generate figures.
     os.makedirs(config.output_dir, exist_ok=True)
     # generate_figures(Gs)
+    generate_wj_figures(Gs)
 
-    latents = np.random.RandomState(100).randn(1, Gs.input_shape[1])
-    dlatents = Gs.components.mapping.run(latents, [[1, 0]])
-    print(dlatents)
+    # latents = np.random.RandomState(100).randn(1, Gs.input_shape[1])
+    # dlatents = Gs.components.mapping.run(latents, [[1, 0]])
+    # print(dlatents)
 
     # draw_color_conditions(Gs, src_seed=200, label=[1, 0, 0, 0, 0])
 
