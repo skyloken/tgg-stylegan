@@ -102,6 +102,39 @@ def save_image_grid(images, filename, drange=[0, 1], grid_size=None):
     convert_to_pil_image(create_image_grid(images, grid_size), drange).save(filename)
 
 
+def get_concat_h(im1, im2):
+    dst = PIL.Image.new('RGB', (im1.width + im2.width, im1.height))
+    dst.paste(im1, (0, 0))
+    dst.paste(im2, (im1.width, 0))
+    return dst
+
+
+def get_concat_v(im1, im2):
+    dst = PIL.Image.new('RGB', (im1.width, im1.height + im2.height))
+    dst.paste(im1, (0, 0))
+    dst.paste(im2, (0, im1.height))
+    return dst
+
+
+def get_concat_h_multi(im_list):
+    _im = im_list.pop(0)
+    for im in im_list:
+        _im = get_concat_h(_im, im)
+    return _im
+
+
+def get_concat_v_multi(im_list):
+    _im = im_list.pop(0)
+    for im in im_list:
+        _im = get_concat_v(_im, im)
+    return _im
+
+
+def get_concat_tile(im_list_2d):
+    im_list_v = [get_concat_h_multi(im_list_h) for im_list_h in im_list_2d]
+    return get_concat_v_multi(im_list_v)
+
+
 # ----------------------------------------------------------------------------
 # Locating results.
 
@@ -285,12 +318,6 @@ def setup_snapshot_image_grid(G, training_set,
 
 # Style Mixing Results
 
-def get_concat_h(im1, im2):
-    dst = PIL.Image.new('RGB', (im1.width + im2.width, im1.height), 'white')
-    dst.paste(im1, (0, 0))
-    dst.paste(im2, (im1.width + 50, 0))
-    return dst
-
 
 def draw_style_mixing_figure(Gs, w, h, src_latents, dst_latents, style_ranges, synthesis_kwargs):
     src_dlatents = Gs.components.mapping.run(src_latents, [[1, 0]] * len(src_latents))
@@ -328,3 +355,22 @@ def save_style_mixing_image(Gs, run_dir, kimg, minibatch_size):
 
     image = get_concat_h(middle_image, fine_image)
     image.save(os.path.join(run_dir, 'style-mixing-%d.png' % kimg))
+
+
+# ----------------------------------------------------------------------------
+
+def convert_1d_to_2d(l, cols):
+    return [l[i:i + cols] for i in range(0, len(l), cols)]
+
+
+def save_wj_image(Gs, run_dir, kimg):
+    img_list = []
+    for _ in range(25):
+        rnd = np.random.RandomState(None)
+        latents = rnd.randn(1, Gs.input_shape[1])
+        fmt = dict(func=tflib.convert_images_to_uint8, nchw_to_nhwc=True)
+        images = Gs.run(latents, [[1, 1]], randomize_noise=False, output_transform=fmt)
+        img_list.append(PIL.Image.fromarray(images[0], 'RGB'))
+
+    img_list_2d = convert_1d_to_2d(img_list, 5)
+    get_concat_tile(img_list_2d).save(os.path.join(run_dir, 'wj-%d.png' % kimg))
