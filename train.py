@@ -17,7 +17,7 @@ from metrics import metric_base
 # ----------------------------------------------------------------------------
 # Official training configs for StyleGAN, targeted mainly for FFHQ.
 
-if 1:
+if 0:
     desc = 'sgan'  # Description string included in result subdir name.
     train         = EasyDict(run_func_name='training.training_loop.training_loop')         # Options for training loop.
     # train = EasyDict(run_func_name='training.training_loop.training_loop', network_snapshot_ticks=2, resume_run_id='latest')  # Options for training loop.
@@ -60,10 +60,10 @@ if 1:
 # ----------------------------------------------------------------------------
 # Training configs for Takeda Goichi Generator
 
-if 0:
+if 1:
     desc = 'tgg-sgan'  # Description string included in result subdir name.
-    # train = EasyDict(run_func_name='training.training_loop.training_loop', save_style_mixing_image=True)  # Options for training loop.
-    train = EasyDict(run_func_name='training.training_loop.training_loop', save_style_mixing_image=True, resume_run_id=1, resume_kimg=30000)  # Options for training loop.
+    train = EasyDict(run_func_name='training.training_loop.training_loop', save_wj_image=True, save_style_mixing_image=False)  # Options for training loop.
+    # train = EasyDict(run_func_name='training.training_loop.training_loop', save_wj_image=True, save_style_mixing_image=False, resume_run_id=0, resume_kimg=30000)  # Options for training loop.
     # train = EasyDict(run_func_name='training.training_loop.training_loop', network_snapshot_ticks=2, resume_run_id='latest')  # Options for training loop.
     # train = EasyDict(run_func_name='training.training_loop.training_loop', network_snapshot_ticks=2, resume_run_id=24, resume_kimg=4941)  # Options for training loop.
     G = EasyDict(func_name='training.networks_stylegan.G_style')  # Options for generator network.
