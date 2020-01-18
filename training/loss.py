@@ -260,6 +260,7 @@ def G_tgg2(G, D, opt, training_set, minibatch_size):  # pylint: disable=unused-a
     loss += tf.nn.softplus(-mixed_scores_out)
     return loss
 
+
 def G_tgg3(G, D, opt, training_set, minibatch_size):  # pylint: disable=unused-argument
 
     latents = tf.random_normal([minibatch_size] + G.input_shapes[0][1:])
