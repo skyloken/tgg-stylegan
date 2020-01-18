@@ -65,6 +65,12 @@ def run_all_snapshots(submit_config, metric_args, run_id):
 def main():
     submit_config = dnnlib.SubmitConfig()
 
+    # Config
+    run_id = 24
+    snapshot = None
+    network_pkl = misc.locate_network_pkl(run_id, snapshot)
+    tfrecord_dir = 'wallpaper_256'
+
     # Which metrics to evaluate?
     metrics = []
     metrics += [metric_base.fid50k]
@@ -77,7 +83,7 @@ def main():
 
     # Which networks to evaluate them on?
     tasks = []
-    tasks += [EasyDict(run_func_name='run_metrics.run_pickle', network_pkl='./results/00010-sgan-logos-1gpu-cond/network-snapshot-020400.pkl', dataset_args=EasyDict(tfrecord_dir='resnet_conditions', shuffle_mb=0), mirror_augment=True)]
+    tasks += [EasyDict(run_func_name='run_metrics.run_pickle', network_pkl=network_pkl, dataset_args=EasyDict(tfrecord_dir=tfrecord_dir, shuffle_mb=0), mirror_augment=True)]
 
     # How many GPUs to use?
     submit_config.num_gpus = 1

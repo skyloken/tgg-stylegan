@@ -6,48 +6,50 @@ import dnnlib
 import dnnlib.tflib as tflib
 import config
 from training import misc
-from generate_figures import *
 
 run_id = 1
 snapshot = None
 width = 256
 height = 256
 
-synthesis_kwargs = dict(output_transform=dict(func=tflib.convert_images_to_uint8, nchw_to_nhwc=True), minibatch_size=8)
+fmt = dict(func=tflib.convert_images_to_uint8, nchw_to_nhwc=True)
+synthesis_kwargs = dict(output_transform=fmt, minibatch_size=8)
 
-def generate_figures(Gs):
 
+# ----------------------------------------------------------------------------
+# Generate figures
+
+def generate_figures(Gs, gen_num=100, truncation_psi=0.7, truncation_cutoff=8, randomize_noise=True):
     # Generate western images
-    for i in range(250):
+    for i in range(gen_num):
         # Pick latent vector.
-        # latents = np.random.RandomState(i).randn(1, Gs.input_shape[1])
-        latents = np.stack([np.random.RandomState(i).randn(Gs.input_shape[1])])
-        # dlatents = Gs.components.mapping.run(latents, [[1, 0]])
-        dlatents = Gs.components.mapping.run(latents, [[1, 0, 0, 0, 0]])
+        latents = np.random.RandomState(i).randn(1, Gs.input_shape[1])
 
         # Generate image.
-        fmt = dict(func=tflib.convert_images_to_uint8, nchw_to_nhwc=True)
-        # images = Gs.run(latents, [[1, 0]], randomize_noise=False, output_transform=fmt)
-        images = Gs.components.synthesis.run(dlatents, randomize_noise=False, **synthesis_kwargs)
+        wst_images = Gs.run(latents, [[1, 0]], truncation_psi=truncation_psi, truncation_cutoff=truncation_cutoff,
+                            randomize_noise=randomize_noise, output_transform=fmt)
+        jpn_images = Gs.run(latents, [[0, 1]], truncation_psi=truncation_psi, truncation_cutoff=truncation_cutoff,
+                            randomize_noise=randomize_noise, output_transform=fmt)
 
         # Save image.
         os.makedirs(config.output_dir, exist_ok=True)
+
         os.makedirs(os.path.join(config.output_dir, 'gen_western_images'), exist_ok=True)
-        png_filename = os.path.join(config.output_dir, 'gen_western_images', 'gen_%s.png' % i)
-        PIL.Image.fromarray(images[0], 'RGB').save(png_filename)
-    
+        PIL.Image.fromarray(wst_images[0], 'RGB').save(
+            os.path.join(config.output_dir, 'gen_western_images', 'gen_%s.png' % i))
+
+        os.makedirs(os.path.join(config.output_dir, 'gen_japanese_images'), exist_ok=True)
+        PIL.Image.fromarray(jpn_images[0], 'RGB').save(
+            os.path.join(config.output_dir, 'gen_japanese_images', 'gen_%s.png' % i))
+
     # Generate japanese images
-    for i in range(250):
+    for i in range(gen_num):
         # Pick latent vector.
-        # latents = np.random.RandomState(i).randn(1, Gs.input_shape[1])
-        latents = np.stack([np.random.RandomState(i).randn(Gs.input_shape[1])])
-        # dlatents = Gs.components.mapping.run(latents, [[0, 1]])
-        dlatents = Gs.components.mapping.run(latents, [[0, 1, 0, 0, 0]])
+        latents = np.random.RandomState(i).randn(1, Gs.input_shape[1])
 
         # Generate image.
-        fmt = dict(func=tflib.convert_images_to_uint8, nchw_to_nhwc=True)
-        # images = Gs.run(latents, [[0, 1]], randomize_noise=False, output_transform=fmt)
-        images = Gs.components.synthesis.run(dlatents, randomize_noise=False, **synthesis_kwargs)
+        images = Gs.run(latents, [[0, 1]], truncation_psi=truncation_psi, truncation_cutoff=truncation_cutoff,
+                        randomize_noise=randomize_noise, output_transform=fmt)
 
         # Save image.
         os.makedirs(config.output_dir, exist_ok=True)
@@ -55,25 +57,42 @@ def generate_figures(Gs):
         png_filename = os.path.join(config.output_dir, 'gen_japanese_images', 'gen_%s.png' % i)
         PIL.Image.fromarray(images[0], 'RGB').save(png_filename)
 
-def generate_wj_figures(Gs):
 
-    # Generate western images
-    for i in range(250):
+def generate_mixings(Gs, gen_num=100, truncation_psi=0.7, randomize_noise=True):
+    dlatent_avg = Gs.get_var('dlatent_avg')
+
+    # Middle
+    middle_style_range = range(4, 8)
+    fine_style_range = range(8, 14)
+    for i in range(gen_num):
         # Pick latent vector.
-        # latents = np.random.RandomState(i).randn(1, Gs.input_shape[1])
-        latents = np.stack([np.random.RandomState(i).randn(Gs.input_shape[1])])
-        dlatents = Gs.components.mapping.run(latents, [[1, 1]])
+        rand = np.random.RandomState(i)
+        wst_latents = rand.randn(1, Gs.input_shape[1])
+        jpn_latents = rand.randn(1, Gs.input_shape[1])
+        wst_dlatents = Gs.components.mapping.run(wst_latents, [[1, 0]])
+        jpn_dlatents = Gs.components.mapping.run(jpn_latents, [[0, 1]])
 
-        # Generate image.
-        fmt = dict(func=tflib.convert_images_to_uint8, nchw_to_nhwc=True)
-        # images = Gs.run(latents, [[1, 0]], randomize_noise=False, output_transform=fmt)
-        images = Gs.components.synthesis.run(dlatents, randomize_noise=False, **synthesis_kwargs)
+        # Truncation trick
+        wst_dlatents = (wst_dlatents - dlatent_avg) * np.reshape([truncation_psi], [-1, 1, 1]) + dlatent_avg
+        jpn_dlatents = (jpn_dlatents - dlatent_avg) * np.reshape([truncation_psi], [-1, 1, 1]) + dlatent_avg
 
-        # Save image.
+        # Style Mixing
+        middle_dlatents = np.copy(wst_dlatents)
+        middle_dlatents[:, middle_style_range] = jpn_dlatents[:, middle_style_range]
+        middle_images = Gs.components.synthesis.run(middle_dlatents, randomize_noise=False, **synthesis_kwargs)
+        fine_dlatents = np.copy(wst_dlatents)
+        fine_dlatents[:, fine_style_range] = jpn_dlatents[:, fine_style_range]
+        fine_images = Gs.components.synthesis.run(fine_dlatents, randomize_noise=False, **synthesis_kwargs)
+
+        # Save
         os.makedirs(config.output_dir, exist_ok=True)
-        os.makedirs(os.path.join(config.output_dir, 'gen_wj_images'), exist_ok=True)
-        png_filename = os.path.join(config.output_dir, 'gen_wj_images', 'gen_%s.png' % i)
-        PIL.Image.fromarray(images[0], 'RGB').save(png_filename)
+        os.makedirs(os.path.join(config.output_dir, 'middle_mixings'), exist_ok=True)
+        PIL.Image.fromarray(middle_images[0], 'RGB').save(
+            os.path.join(config.output_dir, 'middle_mixings', 'gen_%s.png' % i))
+        os.makedirs(os.path.join(config.output_dir, 'fine_mixings'), exist_ok=True)
+        PIL.Image.fromarray(fine_images[0], 'RGB').save(
+            os.path.join(config.output_dir, 'fine_mixings', 'gen_%s.png' % i))
+
 
 def draw_color_conditions(Gs, src_seed, label):
     src_latents = np.random.RandomState(src_seed).randn(1, Gs.input_shape[1])
@@ -82,7 +101,8 @@ def draw_color_conditions(Gs, src_seed, label):
     png_filename = os.path.join(config.output_dir, 'src.png')
     PIL.Image.fromarray(src_image, 'RGB').save(png_filename)
 
-    color_dlatents = Gs.components.mapping.run(np.random.RandomState(src_seed).randn(3, Gs.input_shape[1]), [[0, 0, 1, 0, 0], [0, 0, 0, 1, 0], [0, 0, 0, 0, 1]])
+    color_dlatents = Gs.components.mapping.run(np.random.RandomState(src_seed).randn(3, Gs.input_shape[1]),
+                                               [[0, 0, 1, 0, 0], [0, 0, 0, 1, 0], [0, 0, 0, 0, 1]])
     color_images = Gs.components.synthesis.run(color_dlatents, randomize_noise=False, **synthesis_kwargs)
     PIL.Image.fromarray(color_images[0], 'RGB').save(os.path.join(config.output_dir, 'red.png'))
     PIL.Image.fromarray(color_images[1], 'RGB').save(os.path.join(config.output_dir, 'blue.png'))
@@ -91,10 +111,88 @@ def draw_color_conditions(Gs, src_seed, label):
     colored_dlatents = np.stack([src_dlatents[0]] * len(color_dlatents))
     colored_dlatents[:, 13] = color_dlatents[:, 13]
     images = Gs.components.synthesis.run(colored_dlatents, randomize_noise=False, **synthesis_kwargs)
-    
+
     for i, image in enumerate(images):
         png_filename = os.path.join(config.output_dir, 'gen_%s.png' % i)
         PIL.Image.fromarray(image, 'RGB').save(png_filename)
+
+
+# ----------------------------------------------------------------------------
+# Western and Japanese style mixing.
+
+def draw_western_and_japanese_style_mixing_figure(png, Gs, w, h, src_seeds, dst_seeds, style_ranges):
+    print(png)
+    src_latents = np.stack(np.random.RandomState(seed).randn(Gs.input_shape[1]) for seed in src_seeds)
+    dst_latents = np.stack(np.random.RandomState(seed).randn(Gs.input_shape[1]) for seed in dst_seeds)
+    src_dlatents = Gs.components.mapping.run(src_latents, [[1, 0]] * len(src_seeds))  # [seed, layer, component]
+    dst_dlatents = Gs.components.mapping.run(dst_latents, [[0, 1]] * len(dst_seeds))  # [seed, layer, component]
+    src_images = Gs.components.synthesis.run(src_dlatents, randomize_noise=False, **synthesis_kwargs)
+    dst_images = Gs.components.synthesis.run(dst_dlatents, randomize_noise=False, **synthesis_kwargs)
+
+    canvas = PIL.Image.new('RGB', (w * (len(src_seeds) + 1), h * (len(dst_seeds) + 1)), 'white')
+    for col, src_image in enumerate(list(src_images)):
+        canvas.paste(PIL.Image.fromarray(src_image, 'RGB'), ((col + 1) * w, 0))
+    for row, dst_image in enumerate(list(dst_images)):
+        canvas.paste(PIL.Image.fromarray(dst_image, 'RGB'), (0, (row + 1) * h))
+        row_dlatents = np.stack([dst_dlatents[row]] * len(src_seeds))
+        row_dlatents[:, style_ranges[row]] = src_dlatents[:, style_ranges[row]]
+        row_images = Gs.components.synthesis.run(row_dlatents, randomize_noise=False, **synthesis_kwargs)
+        for col, image in enumerate(list(row_images)):
+            canvas.paste(PIL.Image.fromarray(image, 'RGB'), ((col + 1) * w, (row + 1) * h))
+    canvas.save(png)
+
+
+def draw_japanese_and_western_style_mixing_figure(png, Gs, w, h, src_seeds, dst_seeds, style_ranges):
+    print(png)
+    src_latents = np.stack(np.random.RandomState(seed).randn(Gs.input_shape[1]) for seed in src_seeds)
+    dst_latents = np.stack(np.random.RandomState(seed).randn(Gs.input_shape[1]) for seed in dst_seeds)
+    src_dlatents = Gs.components.mapping.run(src_latents, [[0, 1]] * len(src_seeds))  # [seed, layer, component]
+    dst_dlatents = Gs.components.mapping.run(dst_latents, [[1, 0]] * len(dst_seeds))  # [seed, layer, component]
+    src_images = Gs.components.synthesis.run(src_dlatents, randomize_noise=False, **synthesis_kwargs)
+    dst_images = Gs.components.synthesis.run(dst_dlatents, randomize_noise=False, **synthesis_kwargs)
+
+    canvas = PIL.Image.new('RGB', (w * (len(src_seeds) + 1), h * (len(dst_seeds) + 1)), 'white')
+    for col, src_image in enumerate(list(src_images)):
+        canvas.paste(PIL.Image.fromarray(src_image, 'RGB'), ((col + 1) * w, 0))
+    for row, dst_image in enumerate(list(dst_images)):
+        canvas.paste(PIL.Image.fromarray(dst_image, 'RGB'), (0, (row + 1) * h))
+        row_dlatents = np.stack([dst_dlatents[row]] * len(src_seeds))
+        row_dlatents[:, style_ranges[row]] = src_dlatents[:, style_ranges[row]]
+        row_images = Gs.components.synthesis.run(row_dlatents, randomize_noise=False, **synthesis_kwargs)
+        for col, image in enumerate(list(row_images)):
+            canvas.paste(PIL.Image.fromarray(image, 'RGB'), ((col + 1) * w, (row + 1) * h))
+    canvas.save(png)
+
+
+# ----------------------------------------------------------------------------
+# Style detail
+
+def draw_style_detail(png, Gs, w, h, label, src_seed, dst_seeds, style_range):
+    print(png)
+
+    src_latents = np.random.RandomState(src_seed).randn(1, Gs.input_shape[1])
+    dst_latents = np.stack(np.random.RandomState(seed).randn(Gs.input_shape[1]) for seed in dst_seeds)
+
+    src_dlatents = Gs.components.mapping.run(src_latents, [label])
+    dst_dlatents = Gs.components.mapping.run(dst_latents, [[0, 1, 0, 0, 0]] * len(dst_seeds))
+    src_image = Gs.components.synthesis.run(src_dlatents, randomize_noise=False, **synthesis_kwargs)[0]
+    dst_images = Gs.components.synthesis.run(dst_dlatents, randomize_noise=False, **synthesis_kwargs)
+
+    style_len = src_dlatents.shape[1]
+    canvas = PIL.Image.new('RGB', (w * ((style_len - style_range + 1) + 1), h * (len(dst_seeds) + 1)), 'white')
+    canvas.paste(PIL.Image.fromarray(src_image, 'RGB'), (0, 0))
+    for row, dst_image in enumerate(list(dst_images)):
+        canvas.paste(PIL.Image.fromarray(dst_image, 'RGB'), (0, (row + 1) * h))
+
+        row_dlatents = np.stack([src_dlatents[0]] * (style_len - style_range + 1))
+        for i in range(0, len(row_dlatents)):
+            row_dlatents[i, i:i + style_range] = dst_dlatents[row, i:i + style_range]
+
+        row_images = Gs.components.synthesis.run(row_dlatents, randomize_noise=False, **synthesis_kwargs)
+        for col, image in enumerate(list(row_images)):
+            canvas.paste(PIL.Image.fromarray(image, 'RGB'), ((col + 1) * w, (row + 1) * h))
+    canvas.save(png)
+
 
 def main():
     # Initialize TensorFlow.
@@ -113,19 +211,13 @@ def main():
 
     # Generate figures.
     os.makedirs(config.output_dir, exist_ok=True)
-    # generate_figures(Gs)
-    generate_wj_figures(Gs)
-
-    # latents = np.random.RandomState(100).randn(1, Gs.input_shape[1])
-    # dlatents = Gs.components.mapping.run(latents, [[1, 0]])
-    # print(dlatents)
-
-    # draw_color_conditions(Gs, src_seed=200, label=[1, 0, 0, 0, 0])
+    generate_figures(Gs, gen_num=100, truncation_psi=0.7, truncation_cutoff=8, randomize_noise=True)
+    generate_mixings(Gs, gen_num=100, truncation_psi=0.7, randomize_noise=True)
 
     # draw_western_and_japanese_style_mixing_figure(os.path.join(config.output_dir, 'style-mixing-coarse.png'), Gs, w=width, h=height, src_seeds=[639,701,687,615,2268], dst_seeds=[888,829,1898,1733,1614,845], style_ranges=[range(0,4)]*6)
     # draw_western_and_japanese_style_mixing_figure(os.path.join(config.output_dir, 'style-mixing-middle.png'), Gs, w=width, h=height, src_seeds=[639,701,687,615,2268], dst_seeds=[888,829,1898,1733,1614,845], style_ranges=[range(4,8)]*6)
     # draw_western_and_japanese_style_mixing_figure(os.path.join(config.output_dir, 'style-mixing-fine.png'), Gs, w=width, h=height, src_seeds=[639,701,687,615,2268], dst_seeds=[888,829,1898,1733,1614,845], style_ranges=[range(8,14)]*6)
-    
+
     # draw_western_and_japanese_style_mixing_figure(os.path.join(config.output_dir, 'style-mixing-coarse.png'), Gs, w=width, h=height, src_seeds=[81,175,186,206], dst_seeds=[7,40,61,100], style_ranges=[range(0,4)]*4)
     # draw_western_and_japanese_style_mixing_figure(os.path.join(config.output_dir, 'style-mixing-middle.png'), Gs, w=width, h=height, src_seeds=[81,175,186,206], dst_seeds=[7,40,61,100], style_ranges=[range(4,8)]*4)
     # draw_western_and_japanese_style_mixing_figure(os.path.join(config.output_dir, 'style-mixing-fine.png'), Gs, w=width, h=height, src_seeds=[81,175,186,206], dst_seeds=[7,40,61,100], style_ranges=[range(8,14)]*4)
@@ -147,6 +239,7 @@ def main():
     # draw_noise_components_figure(os.path.join(config.output_dir, 'noise-components.png'), Gs, w=width, h=height, seeds=[1967,1555], noise_ranges=[range(0, 18), range(0, 0), range(8, 18), range(0, 8)], flips=[1])
     # draw_truncation_trick_figure(os.path.join(config.output_dir, 'truncation-trick.png'), Gs, w=width, h=height, seeds=[91,388], psis=[1, 0.7, 0.5, 0, -0.5, -1])
     # draw_transition_figure(os.path.join(config.output_dir, 'transition_%s_to_%s.gif' % (9, 16)), Gs, w=width, h=height, src_seed=9, dst_seed=16)
+
 
 if __name__ == "__main__":
     main()
