@@ -117,21 +117,14 @@ class MetricBase:
             yield images
 
     def _iterate_reals_for_label(self, minibatch_size, label):
-        dataset_obj = dataset.load_dataset(data_dir=config.data_dir, **self._dataset_args)
+        if label == [1, 0]:
+            tfrecord_dir = 'wallpaper_256_wst'
+        elif label == [0, 1]:
+            tfrecord_dir = 'wallpaper_256_jpn'
+        dataset_obj = dataset.load_dataset(data_dir=config.data_dir, tfrecord_dir=tfrecord_dir, shuffle_mb=0)
+
         while True:
-            i = 0
-            while True:
-                _images, labels = dataset_obj.get_minibatch_np(minibatch_size)
-                label_indices = np.where((labels == label).all(axis=1))
-                label_images = _images[label_indices]
-                if i == 0:
-                    images = label_images
-                else:
-                    np.concatenate([images, label_images])
-                i += 1
-                if images.shape[0] >= minibatch_size:
-                    break
-            images = images[:minibatch_size]
+            images, _labels = dataset_obj.get_minibatch_np(minibatch_size)
             if self._mirror_augment:
                 images = misc.apply_mirror_augment(images)
             yield images

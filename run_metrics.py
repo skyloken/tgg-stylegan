@@ -70,7 +70,7 @@ def main():
     submit_config = dnnlib.SubmitConfig()
 
     # Config
-    run_id = 24
+    run_id = 0
     snapshot = None
     network_pkl = misc.locate_network_pkl(run_id, snapshot)
     tfrecord_dir = 'wallpaper_256'
