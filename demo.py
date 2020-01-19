@@ -9,6 +9,7 @@ import config
 from training import misc
 import random
 import time
+import datetime
 
 seed = 100
 run_id = 0
@@ -35,9 +36,7 @@ class Application(tk.Frame):
         _G, _D, self.Gs = misc.load_pkl(network_pkl)
     
     def get_label(self):
-        western = 1 if self.is_western.get() else 0
-        japanese = 1 if self.is_japanese.get() else 0
-        return [western, japanese]
+        return [self.western_var.get(), self.japanese_var.get()]
 
     def generate_figure(self):
         label = self.get_label()
@@ -48,7 +47,8 @@ class Application(tk.Frame):
             dlatent_avg = self.Gs.get_var('dlatent_avg')
             self.dlatents = (self.dlatents - dlatent_avg) * np.reshape([self.truncation_psi_var.get()], [-1, 1, 1]) + dlatent_avg
         images = self.Gs.run(self.latents, [label], truncation_psi=self.truncation_psi_var.get(), truncation_cutoff=15, is_validation=self.is_validation.get(), randomize_noise=False, output_transform=fmt)
-        return ImageTk.PhotoImage(image=Image.fromarray(images[0], 'RGB').resize((512, 512)))
+        self.current_image = Image.fromarray(images[0], 'RGB')
+        return ImageTk.PhotoImage(image=self.current_image.resize((512, 512)))
 
     def generate_transition_animation(self):
         label = self.get_label()
@@ -61,7 +61,8 @@ class Application(tk.Frame):
             latents = self.latents + (dst_latents - self.latents) * i / num_split
             images_out = self.Gs.run(latents, [label], truncation_psi=self.truncation_psi_var.get(), truncation_cutoff=15,
                                      is_validation=self.is_validation.get(), randomize_noise=False, output_transform=fmt)
-            images.append(ImageTk.PhotoImage(image=Image.fromarray(images_out[0], 'RGB').resize((512, 512))))
+            self.current_image = Image.fromarray(images_out[0], 'RGB')
+            images.append(ImageTk.PhotoImage(image=self.current_image.resize((512, 512))))
 
         self.latents = dst_latents
         self.dlatents = self.Gs.components.mapping.run(self.latents, [label])
@@ -88,16 +89,17 @@ class Application(tk.Frame):
         elif self.style_var.get() == 3:
             self.dlatents[:, 13:14] = dst_dlatents[:, 13:14]
         images = self.Gs.components.synthesis.run(self.dlatents, randomize_noise=False, output_transform=fmt)
-        return ImageTk.PhotoImage(image=Image.fromarray(images[0], 'RGB').resize((512, 512)))
+        self.current_image = Image.fromarray(images[0], 'RGB')
+        return ImageTk.PhotoImage(image=self.current_image.resize((512, 512)))
 
     def create_widgets(self):
         global img
 
         # values
-        self.is_western = tk.BooleanVar()
-        self.is_western.set(True)
-        self.is_japanese = tk.BooleanVar()
-        self.is_japanese.set(False)
+        self.western_var = tk.DoubleVar()
+        self.western_var.set(1.0)
+        self.japanese_var = tk.DoubleVar()
+        self.japanese_var.set(0.0)
         self.is_validation = tk.BooleanVar()
         self.is_validation.set(False)
         self.is_animation = tk.BooleanVar()
@@ -112,9 +114,10 @@ class Application(tk.Frame):
         self.canvas = tk.Canvas(self, width=width, height=height)
         self.image_on_canvas = self.canvas.create_image(0, 0, anchor='nw', image=img)
 
-        # Label button
-        self.western_checkbox = tk.Checkbutton(self, text='Western', variable=self.is_western)
-        self.japanese_checkbox = tk.Checkbutton(self, text='Japanese', variable=self.is_japanese)
+        # Label
+        self.western_scale = tk.Scale(self, orient="horizontal", variable=self.western_var, length=200, from_=0.0, to=1.0, resolution=0.1)
+        self.japanese_scale = tk.Scale(self, orient="horizontal", variable=self.japanese_var, length=200, from_=0.0, to=1.0, resolution=0.1)
+
 
         # Style button
         self.middle_radio_button = tk.Radiobutton(self, value=0, variable=self.style_var, text='Middle')
@@ -125,19 +128,22 @@ class Application(tk.Frame):
         # Settings
         self.validation_checkbox = tk.Checkbutton(self, text='Validation', variable=self.is_validation)
         self.animation_checkbox = tk.Checkbutton(self, text='Animation', variable=self.is_animation)
-        self.truncation_psi_scale = tk.Scale(self, orient="horizontal", variable=self.truncation_psi_var, length=200, from_=-1.0, to=1.0, resolution=0.1)
+        self.truncation_psi_scale = tk.Scale(self, orient="horizontal", variable=self.truncation_psi_var, length=400, from_=-1.0, to=1.0, resolution=0.1)
 
         # Generate button
         self.generate_button = tk.Button(self, text='Generate', command=self.generate)
         self.change_style_button = tk.Button(self, text='Change style', command=self.change_style)
+
+        # Save button
+        self.save_button = tk.Button(self, text='Save image', command=self.save_image)
 
         # Quit button
         self.quit_button = tk.Button(self, text='Quit', fg='red', command=self.master.destroy)
 
         # Pack
         self.canvas.pack()
-        self.western_checkbox.pack()
-        self.japanese_checkbox.pack()
+        self.western_scale.pack()
+        self.japanese_scale.pack()
         self.validation_checkbox.pack()
         self.animation_checkbox.pack()
         self.truncation_psi_scale.pack()
@@ -147,6 +153,7 @@ class Application(tk.Frame):
         self.pattern_radio_button.pack()
         self.color_radio_button.pack()
         self.change_style_button.pack()
+        self.save_button.pack()
         self.quit_button.pack()
 
     def generate(self):
@@ -174,6 +181,11 @@ class Application(tk.Frame):
 
         img = self.generate_style_changed_figure()
         self.canvas.itemconfig(self.image_on_canvas, image=img)
+    
+    def save_image(self):
+        now = datetime.datetime.now()
+        filename = 'gen_' + now.strftime('%H%M%S') + 'w%1.1fj%1.1ft%1.1f' % (self.western_var.get(), self.japanese_var.get(), self.truncation_psi_var.get()) + '.png'
+        self.current_image.save(os.path.join(config.output_dir, filename))
 
 
 if __name__ == '__main__':
