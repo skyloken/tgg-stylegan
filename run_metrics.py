@@ -18,7 +18,8 @@ import config
 from metrics import metric_base
 from training import misc
 
-#----------------------------------------------------------------------------
+
+# ----------------------------------------------------------------------------
 
 def run_pickle(submit_config, metric_args, network_pkl, dataset_args, mirror_augment):
     ctx = dnnlib.RunContext(submit_config)
@@ -30,7 +31,8 @@ def run_pickle(submit_config, metric_args, network_pkl, dataset_args, mirror_aug
     print()
     ctx.close()
 
-#----------------------------------------------------------------------------
+
+# ----------------------------------------------------------------------------
 
 def run_snapshot(submit_config, metric_args, run_id, snapshot):
     ctx = dnnlib.RunContext(submit_config)
@@ -44,7 +46,8 @@ def run_snapshot(submit_config, metric_args, run_id, snapshot):
     print()
     ctx.close()
 
-#----------------------------------------------------------------------------
+
+# ----------------------------------------------------------------------------
 
 def run_all_snapshots(submit_config, metric_args, run_id):
     ctx = dnnlib.RunContext(submit_config)
@@ -60,7 +63,8 @@ def run_all_snapshots(submit_config, metric_args, run_id):
     print()
     ctx.close()
 
-#----------------------------------------------------------------------------
+
+# ----------------------------------------------------------------------------
 
 def main():
     submit_config = dnnlib.SubmitConfig()
@@ -73,23 +77,25 @@ def main():
 
     # Which metrics to evaluate?
     metrics = []
-    metrics += [metric_base.fid50k]
-    #metrics += [metric_base.ppl_zfull]
-    #metrics += [metric_base.ppl_wfull]
-    #metrics += [metric_base.ppl_zend]
-    #metrics += [metric_base.ppl_wend]
-    #metrics += [metric_base.ls]
-    #metrics += [metric_base.dummy]
+    # metrics += [metric_base.fid50k]
+    metrics += [metric_base.tggfid]
+    # metrics += [metric_base.ppl_zfull]
+    # metrics += [metric_base.ppl_wfull]
+    # metrics += [metric_base.ppl_zend]
+    # metrics += [metric_base.ppl_wend]
+    # metrics += [metric_base.ls]
+    # metrics += [metric_base.dummy]
 
     # Which networks to evaluate them on?
     tasks = []
-    tasks += [EasyDict(run_func_name='run_metrics.run_pickle', network_pkl=network_pkl, dataset_args=EasyDict(tfrecord_dir=tfrecord_dir, shuffle_mb=0), mirror_augment=True)]
+    tasks += [EasyDict(run_func_name='run_metrics.run_pickle', network_pkl=network_pkl,
+                       dataset_args=EasyDict(tfrecord_dir=tfrecord_dir, shuffle_mb=0), mirror_augment=True)]
 
     # How many GPUs to use?
     submit_config.num_gpus = 1
-    #submit_config.num_gpus = 2
-    #submit_config.num_gpus = 4
-    #submit_config.num_gpus = 8
+    # submit_config.num_gpus = 2
+    # submit_config.num_gpus = 4
+    # submit_config.num_gpus = 8
 
     # Execute.
     submit_config.run_dir_root = dnnlib.submission.submit.get_template_from_path(config.result_dir)
@@ -104,9 +110,10 @@ def main():
             submit_config.run_desc += '-%dgpu' % submit_config.num_gpus
             dnnlib.submit_run(submit_config, metric_args=metric, **task)
 
-#----------------------------------------------------------------------------
+
+# ----------------------------------------------------------------------------
 
 if __name__ == "__main__":
     main()
 
-#----------------------------------------------------------------------------
+# ----------------------------------------------------------------------------

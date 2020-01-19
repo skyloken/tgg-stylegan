@@ -21,7 +21,8 @@ import dnnlib.tflib as tflib
 from metrics import metric_base
 from training import misc
 
-#----------------------------------------------------------------------------
+
+# ----------------------------------------------------------------------------
 
 class FID(metric_base.MetricBase):
     def __init__(self, num_images, minibatch_per_gpu, **kwargs):
@@ -31,7 +32,8 @@ class FID(metric_base.MetricBase):
 
     def _evaluate(self, Gs, num_gpus):
         minibatch_size = num_gpus * self.minibatch_per_gpu
-        inception = misc.load_pkl('https://drive.google.com/uc?id=1MzTY44rLToO5APn8TZmfR7_ENSe5aZUn') # inception_v3_features.pkl
+        inception = misc.load_pkl(
+            'https://drive.google.com/uc?id=1MzTY44rLToO5APn8TZmfR7_ENSe5aZUn')  # inception_v3_features.pkl
         activations = np.empty([self.num_images, inception.output_shape[1]], dtype=np.float32)
 
         # Calculate statistics for reals.
@@ -43,7 +45,7 @@ class FID(metric_base.MetricBase):
             for idx, images in enumerate(self._iterate_reals(minibatch_size=minibatch_size)):
                 begin = idx * minibatch_size
                 end = min(begin + minibatch_size, self.num_images)
-                activations[begin:end] = inception.run(images[:end-begin], num_gpus=num_gpus, assume_frozen=True)
+                activations[begin:end] = inception.run(images[:end - begin], num_gpus=num_gpus, assume_frozen=True)
                 if end == self.num_images:
                     break
             mu_real = np.mean(activations, axis=0)
@@ -59,8 +61,8 @@ class FID(metric_base.MetricBase):
 
                 labels_exist = input("Labelled Data? [True/False] ")
                 if labels_exist == True:
-                    a = np.random.randint(0,10, self.minibatch_per_gpu)
-                    labels = np.zeros((a.shape[0], a.max()+1))
+                    a = np.random.randint(0, 2, self.minibatch_per_gpu)
+                    labels = np.zeros((a.shape[0], a.max() + 1))
                     labels[np.arange(len(a)), a] = 1
                     ''' End '''
                     print("[INFO] Getting Generator Output")
@@ -76,14 +78,14 @@ class FID(metric_base.MetricBase):
         # Calculate statistics for fakes.
         for begin in range(0, self.num_images, minibatch_size):
             end = min(begin + minibatch_size, self.num_images)
-            activations[begin:end] = np.concatenate(tflib.run(result_expr), axis=0)[:end-begin]
+            activations[begin:end] = np.concatenate(tflib.run(result_expr), axis=0)[:end - begin]
         mu_fake = np.mean(activations, axis=0)
         sigma_fake = np.cov(activations, rowvar=False)
 
         # Calculate FID.
         m = np.square(mu_fake - mu_real).sum()
-        s, _ = scipy.linalg.sqrtm(np.dot(sigma_fake, sigma_real), disp=False) # pylint: disable=no-member
-        dist = m + np.trace(sigma_fake + sigma_real - 2*s)
+        s, _ = scipy.linalg.sqrtm(np.dot(sigma_fake, sigma_real), disp=False)  # pylint: disable=no-member
+        dist = m + np.trace(sigma_fake + sigma_real - 2 * s)
         self._report_result(np.real(dist))
 
-#----------------------------------------------------------------------------
+# ----------------------------------------------------------------------------
