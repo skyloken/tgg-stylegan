@@ -12,7 +12,7 @@ import time
 import datetime
 
 seed = 100
-run_id = 0
+run_id = 5
 snapshot = None
 width = 512
 height = 512
@@ -36,7 +36,7 @@ class Application(tk.Frame):
         _G, _D, self.Gs = misc.load_pkl(network_pkl)
     
     def get_label(self):
-        return [self.western_var.get(), self.japanese_var.get()]
+        return np.eye(2)[self.label_var.get()]
 
     def generate_figure(self):
         label = self.get_label()
@@ -53,7 +53,7 @@ class Application(tk.Frame):
     def generate_transition_animation(self):
         label = self.get_label()
         images = []
-        num_split = 100
+        num_split = 50
         rnd = np.random.RandomState(None)
         dst_latents = rnd.randn(1, self.Gs.input_shape[1])
 
@@ -96,14 +96,14 @@ class Application(tk.Frame):
         global img
 
         # values
-        self.western_var = tk.DoubleVar()
-        self.western_var.set(1.0)
-        self.japanese_var = tk.DoubleVar()
-        self.japanese_var.set(0.0)
+        self.label_var = tk.IntVar()
+        self.label_var.set(0)
         self.is_validation = tk.BooleanVar()
         self.is_validation.set(False)
         self.is_animation = tk.BooleanVar()
         self.is_animation.set(False)
+        self.is_loop = tk.BooleanVar()
+        self.is_loop.set(False)
         self.truncation_psi_var = tk.DoubleVar()
         self.truncation_psi_var.set(0.7)
         self.style_var = tk.IntVar()
@@ -115,9 +115,8 @@ class Application(tk.Frame):
         self.image_on_canvas = self.canvas.create_image(0, 0, anchor='nw', image=img)
 
         # Label
-        self.western_scale = tk.Scale(self, orient="horizontal", variable=self.western_var, length=200, from_=0.0, to=1.0, resolution=0.1)
-        self.japanese_scale = tk.Scale(self, orient="horizontal", variable=self.japanese_var, length=200, from_=0.0, to=1.0, resolution=0.1)
-
+        self.western_radio_button = tk.Radiobutton(self, value=0, variable=self.label_var, text='Western')
+        self.japanese_radio_button = tk.Radiobutton(self, value=1, variable=self.label_var, text='Japanese')
 
         # Style button
         self.middle_radio_button = tk.Radiobutton(self, value=0, variable=self.style_var, text='Middle')
@@ -128,6 +127,7 @@ class Application(tk.Frame):
         # Settings
         self.validation_checkbox = tk.Checkbutton(self, text='Validation', variable=self.is_validation)
         self.animation_checkbox = tk.Checkbutton(self, text='Animation', variable=self.is_animation)
+        self.loop_checkbox = tk.Checkbutton(self, text='Loop', variable=self.is_loop)
         self.truncation_psi_scale = tk.Scale(self, orient="horizontal", variable=self.truncation_psi_var, length=400, from_=-1.0, to=1.0, resolution=0.1)
 
         # Generate button
@@ -142,10 +142,11 @@ class Application(tk.Frame):
 
         # Pack
         self.canvas.pack()
-        self.western_scale.pack()
-        self.japanese_scale.pack()
+        self.western_radio_button.pack()
+        self.japanese_radio_button.pack()
         self.validation_checkbox.pack()
         self.animation_checkbox.pack()
+        self.loop_checkbox.pack()
         self.truncation_psi_scale.pack()
         self.generate_button.pack()
         self.middle_radio_button.pack()
@@ -163,12 +164,15 @@ class Application(tk.Frame):
             self.generate_button['text'] = 'Generating...'
             self.generate_button['state'] = 'disable'
 
-            images = self.generate_transition_animation()
-            for image in images:
-                img = image
-                self.canvas.itemconfig(self.image_on_canvas, image=img)
-                self.canvas.update()
-                time.sleep(0.05)
+            while True:
+                images = self.generate_transition_animation()
+                for image in images:
+                    img = image
+                    self.canvas.itemconfig(self.image_on_canvas, image=img)
+                    self.canvas.update()
+                    time.sleep(0.05)
+                if not self.is_loop.get():
+                    break
 
             self.generate_button['text'] = 'Generate'
             self.generate_button['state'] = 'normal'
@@ -184,7 +188,7 @@ class Application(tk.Frame):
     
     def save_image(self):
         now = datetime.datetime.now()
-        filename = 'gen_' + now.strftime('%H%M%S') + 'w%1.1fj%1.1ft%1.1f' % (self.western_var.get(), self.japanese_var.get(), self.truncation_psi_var.get()) + '.png'
+        filename = 'gen_' + now.strftime('%H%M%S') + '-%s-t%1.1f' % (self.get_label(), self.truncation_psi_var.get()) + '.png'
         self.current_image.save(os.path.join(config.output_dir, filename))
 
 

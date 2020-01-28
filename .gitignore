@@ -137,3 +137,4 @@ dmypy.json
 /data/
 /cache/
 /outputs/
+/.vscode/
