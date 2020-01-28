@@ -1,18 +1,17 @@
-import tkinter as tk
+import datetime
 import os
-import pickle
+import time
+import tkinter as tk
+
 import numpy as np
 from PIL import Image, ImageTk
-import dnnlib
-import dnnlib.tflib as tflib
+
 import config
+import dnnlib.tflib as tflib
 from training import misc
-import random
-import time
-import datetime
 
 seed = 100
-run_id = 5
+run_id = 0
 snapshot = None
 width = 512
 height = 512
@@ -34,7 +33,7 @@ class Application(tk.Frame):
         network_pkl = misc.locate_network_pkl(run_id, snapshot)
         print('Loading networks from "%s"...' % network_pkl)
         _G, _D, self.Gs = misc.load_pkl(network_pkl)
-    
+
     def get_label(self):
         return np.eye(2)[self.label_var.get()]
 
@@ -45,8 +44,10 @@ class Application(tk.Frame):
         self.dlatents = self.Gs.components.mapping.run(self.latents, [label])
         if not self.is_validation.get():
             dlatent_avg = self.Gs.get_var('dlatent_avg')
-            self.dlatents = (self.dlatents - dlatent_avg) * np.reshape([self.truncation_psi_var.get()], [-1, 1, 1]) + dlatent_avg
-        images = self.Gs.run(self.latents, [label], truncation_psi=self.truncation_psi_var.get(), truncation_cutoff=15, is_validation=self.is_validation.get(), randomize_noise=False, output_transform=fmt)
+            self.dlatents = (self.dlatents - dlatent_avg) * np.reshape([self.truncation_psi_var.get()],
+                                                                       [-1, 1, 1]) + dlatent_avg
+        images = self.Gs.run(self.latents, [label], truncation_psi=self.truncation_psi_var.get(), truncation_cutoff=15,
+                             is_validation=self.is_validation.get(), randomize_noise=False, output_transform=fmt)
         self.current_image = Image.fromarray(images[0], 'RGB')
         return ImageTk.PhotoImage(image=self.current_image.resize((512, 512)))
 
@@ -59,8 +60,10 @@ class Application(tk.Frame):
 
         for i in range(num_split + 1):
             latents = self.latents + (dst_latents - self.latents) * i / num_split
-            images_out = self.Gs.run(latents, [label], truncation_psi=self.truncation_psi_var.get(), truncation_cutoff=15,
-                                     is_validation=self.is_validation.get(), randomize_noise=False, output_transform=fmt)
+            images_out = self.Gs.run(latents, [label], truncation_psi=self.truncation_psi_var.get(),
+                                     truncation_cutoff=15,
+                                     is_validation=self.is_validation.get(), randomize_noise=False,
+                                     output_transform=fmt)
             self.current_image = Image.fromarray(images_out[0], 'RGB')
             images.append(ImageTk.PhotoImage(image=self.current_image.resize((512, 512))))
 
@@ -68,7 +71,8 @@ class Application(tk.Frame):
         self.dlatents = self.Gs.components.mapping.run(self.latents, [label])
         if not self.is_validation.get():
             dlatent_avg = self.Gs.get_var('dlatent_avg')
-            self.dlatents = (self.dlatents - dlatent_avg) * np.reshape([self.truncation_psi_var.get()], [-1, 1, 1]) + dlatent_avg
+            self.dlatents = (self.dlatents - dlatent_avg) * np.reshape([self.truncation_psi_var.get()],
+                                                                       [-1, 1, 1]) + dlatent_avg
 
         return images
 
@@ -76,7 +80,7 @@ class Application(tk.Frame):
 
         label = self.get_label()
         rnd = np.random.RandomState(None)
-        
+
         dst_latents = rnd.randn(1, self.Gs.input_shape[1])
         dst_dlatents = self.Gs.components.mapping.run(dst_latents, [label])
 
@@ -128,7 +132,8 @@ class Application(tk.Frame):
         self.validation_checkbox = tk.Checkbutton(self, text='Validation', variable=self.is_validation)
         self.animation_checkbox = tk.Checkbutton(self, text='Animation', variable=self.is_animation)
         self.loop_checkbox = tk.Checkbutton(self, text='Loop', variable=self.is_loop)
-        self.truncation_psi_scale = tk.Scale(self, orient="horizontal", variable=self.truncation_psi_var, length=400, from_=-1.0, to=1.0, resolution=0.1)
+        self.truncation_psi_scale = tk.Scale(self, orient="horizontal", variable=self.truncation_psi_var, length=400,
+                                             from_=-1.0, to=1.0, resolution=0.1)
 
         # Generate button
         self.generate_button = tk.Button(self, text='Generate', command=self.generate)
@@ -185,10 +190,11 @@ class Application(tk.Frame):
 
         img = self.generate_style_changed_figure()
         self.canvas.itemconfig(self.image_on_canvas, image=img)
-    
+
     def save_image(self):
         now = datetime.datetime.now()
-        filename = 'gen_' + now.strftime('%H%M%S') + '-%s-t%1.1f' % (self.get_label(), self.truncation_psi_var.get()) + '.png'
+        filename = 'gen_' + now.strftime('%H%M%S') + '-%s-t%1.1f' % (
+        self.get_label(), self.truncation_psi_var.get()) + '.png'
         self.current_image.save(os.path.join(config.output_dir, filename))
 
 

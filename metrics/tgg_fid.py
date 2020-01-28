@@ -51,10 +51,6 @@ class TGG_FID(metric_base.MetricBase):
         for src_label in labels:
             for style_pattern in style_patterns:
                 for real_label in labels:
-                    
-                    # TODO: SKIP
-                    if src_label == [1, 0] and len(list(style_pattern[0])) > 3:
-                        continue
 
                     # Construct TensorFlow graph.
                     result_expr = []
