@@ -20,11 +20,13 @@ import numpy as np
 from collections import defaultdict
 import PIL.Image
 import dnnlib
+import dnnlib.tflib as tflib
 
 import config
 from training import dataset
 
-#----------------------------------------------------------------------------
+
+# ----------------------------------------------------------------------------
 # Convenience wrappers for pickle that are able to load data produced by
 # older versions of the code, and from external URLs.
 
@@ -33,23 +35,28 @@ def open_file_or_url(file_or_url):
         return dnnlib.util.open_url(file_or_url, cache_dir=config.cache_dir)
     return open(file_or_url, 'rb')
 
+
 def load_pkl(file_or_url):
     with open_file_or_url(file_or_url) as file:
         return pickle.load(file, encoding='latin1')
+
 
 def save_pkl(obj, filename):
     with open(filename, 'wb') as file:
         pickle.dump(obj, file, protocol=pickle.HIGHEST_PROTOCOL)
 
-#----------------------------------------------------------------------------
+
+# ----------------------------------------------------------------------------
 # Image utils.
 
 def adjust_dynamic_range(data, drange_in, drange_out):
     if drange_in != drange_out:
-        scale = (np.float32(drange_out[1]) - np.float32(drange_out[0])) / (np.float32(drange_in[1]) - np.float32(drange_in[0]))
+        scale = (np.float32(drange_out[1]) - np.float32(drange_out[0])) / (
+                np.float32(drange_in[1]) - np.float32(drange_in[0]))
         bias = (np.float32(drange_out[0]) - np.float32(drange_in[0]) * scale)
         data = data * scale + bias
     return data
+
 
 def create_image_grid(images, grid_size=None):
     assert images.ndim == 3 or images.ndim == 4
@@ -65,33 +72,70 @@ def create_image_grid(images, grid_size=None):
     for idx in range(num):
         x = (idx % grid_w) * img_w
         y = (idx // grid_w) * img_h
-        grid[..., y : y + img_h, x : x + img_w] = images[idx]
+        grid[..., y: y + img_h, x: x + img_w] = images[idx]
     return grid
 
-def convert_to_pil_image(image, drange=[0,1]):
+
+def convert_to_pil_image(image, drange=[0, 1]):
     assert image.ndim == 2 or image.ndim == 3
     if image.ndim == 3:
         if image.shape[0] == 1:
-            image = image[0] # grayscale CHW => HW
+            image = image[0]  # grayscale CHW => HW
         else:
-            image = image.transpose(1, 2, 0) # CHW -> HWC
+            image = image.transpose(1, 2, 0)  # CHW -> HWC
 
-    image = adjust_dynamic_range(image, drange, [0,255])
+    image = adjust_dynamic_range(image, drange, [0, 255])
     image = np.rint(image).clip(0, 255).astype(np.uint8)
     fmt = 'RGB' if image.ndim == 3 else 'L'
     return PIL.Image.fromarray(image, fmt)
 
-def save_image(image, filename, drange=[0,1], quality=95):
+
+def save_image(image, filename, drange=[0, 1], quality=95):
     img = convert_to_pil_image(image, drange)
     if '.jpg' in filename:
-        img.save(filename,"JPEG", quality=quality, optimize=True)
+        img.save(filename, "JPEG", quality=quality, optimize=True)
     else:
         img.save(filename)
 
-def save_image_grid(images, filename, drange=[0,1], grid_size=None):
+
+def save_image_grid(images, filename, drange=[0, 1], grid_size=None):
     convert_to_pil_image(create_image_grid(images, grid_size), drange).save(filename)
 
-#----------------------------------------------------------------------------
+
+def get_concat_h(im1, im2):
+    dst = PIL.Image.new('RGB', (im1.width + im2.width, im1.height))
+    dst.paste(im1, (0, 0))
+    dst.paste(im2, (im1.width, 0))
+    return dst
+
+
+def get_concat_v(im1, im2):
+    dst = PIL.Image.new('RGB', (im1.width, im1.height + im2.height))
+    dst.paste(im1, (0, 0))
+    dst.paste(im2, (0, im1.height))
+    return dst
+
+
+def get_concat_h_multi(im_list):
+    _im = im_list.pop(0)
+    for im in im_list:
+        _im = get_concat_h(_im, im)
+    return _im
+
+
+def get_concat_v_multi(im_list):
+    _im = im_list.pop(0)
+    for im in im_list:
+        _im = get_concat_v(_im, im)
+    return _im
+
+
+def get_concat_tile(im_list_2d):
+    im_list_v = [get_concat_h_multi(im_list_h) for im_list_h in im_list_2d]
+    return get_concat_v_multi(im_list_v)
+
+
+# ----------------------------------------------------------------------------
 # Locating results.
 
 def locate_run_dir(run_id_or_run_dir):
@@ -104,7 +148,8 @@ def locate_run_dir(run_id_or_run_dir):
 
     run_dir_pattern = re.compile('^0*%s-' % str(run_id_or_run_dir))
     for search_dir in ['']:
-        full_search_dir = config.result_dir if search_dir == '' else os.path.normpath(os.path.join(config.result_dir, search_dir))
+        full_search_dir = config.result_dir if search_dir == '' else os.path.normpath(
+            os.path.join(config.result_dir, search_dir))
         run_dir = os.path.join(full_search_dir, str(run_id_or_run_dir))
         if os.path.isdir(run_dir):
             return run_dir
@@ -115,6 +160,7 @@ def locate_run_dir(run_id_or_run_dir):
             return run_dirs[0]
     raise IOError('Cannot locate result subdir for run', run_id_or_run_dir)
 
+
 def list_network_pkls(run_id_or_run_dir, include_final=True):
     run_dir = locate_run_dir(run_id_or_run_dir)
     pkls = sorted(glob.glob(os.path.join(run_dir, 'network-*.pkl')))
@@ -124,6 +170,7 @@ def list_network_pkls(run_id_or_run_dir, include_final=True):
         del pkls[0]
     return pkls
 
+
 def locate_latest_pkl():
     allpickles = sorted(glob.glob(os.path.join(config.result_dir, '0*', 'network-*.pkl')))
     latest_pickle = allpickles[-1]
@@ -131,6 +178,7 @@ def locate_latest_pkl():
     RE_KIMG = re.compile('network-snapshot-(\d+).pkl')
     kimg = int(RE_KIMG.match(os.path.basename(latest_pickle)).group(1))
     return (locate_network_pkl(resume_run_id), float(kimg))
+
 
 def locate_network_pkl(run_id_or_run_dir_or_network_pkl, snapshot_or_network_pkl=None):
     for candidate in [snapshot_or_network_pkl, run_id_or_run_dir_or_network_pkl]:
@@ -151,19 +199,24 @@ def locate_network_pkl(run_id_or_run_dir_or_network_pkl, snapshot_or_network_pkl
             number = int(name.split('-')[-1])
             if number == snapshot_or_network_pkl:
                 return pkl
-        except ValueError: pass
-        except IndexError: pass
+        except ValueError:
+            pass
+        except IndexError:
+            pass
     raise IOError('Cannot locate network pkl for snapshot', snapshot_or_network_pkl)
+
 
 def get_id_string_for_network_pkl(network_pkl):
     p = network_pkl.replace('.pkl', '').replace('\\', '/').split('/')
     return '-'.join(p[max(len(p) - 2, 0):])
 
-#----------------------------------------------------------------------------
+
+# ----------------------------------------------------------------------------
 # Loading data from previous training runs.
 
 def load_network_pkl(run_id_or_run_dir_or_network_pkl, snapshot_or_network_pkl=None):
     return load_pkl(locate_network_pkl(run_id_or_run_dir_or_network_pkl, snapshot_or_network_pkl))
+
 
 def parse_config_for_previous_run(run_id):
     run_dir = locate_run_dir(run_id)
@@ -174,7 +227,7 @@ def parse_config_for_previous_run(run_id):
         for line in f:
             line = re.sub(r"^{?\s*'(\w+)':\s*{(.*)(},|}})$", r"\1 = {\2}", line.strip())
             if line.startswith('dataset =') or line.startswith('train ='):
-                exec(line, cfg, cfg) # pylint: disable=exec-used
+                exec(line, cfg, cfg)  # pylint: disable=exec-used
 
     # Handle legacy options.
     if 'file_pattern' in cfg['dataset']:
@@ -190,12 +243,14 @@ def parse_config_for_previous_run(run_id):
         cfg['dataset'].pop('max_images')
     return cfg
 
-def load_dataset_for_previous_run(run_id, **kwargs): # => dataset_obj, mirror_augment
+
+def load_dataset_for_previous_run(run_id, **kwargs):  # => dataset_obj, mirror_augment
     cfg = parse_config_for_previous_run(run_id)
     cfg['dataset'].update(kwargs)
     dataset_obj = dataset.load_dataset(data_dir=config.data_dir, **cfg['dataset'])
     mirror_augment = cfg['train'].get('mirror_augment', False)
     return dataset_obj, mirror_augment
+
 
 def apply_mirror_augment(minibatch):
     mask = np.random.rand(minibatch.shape[0]) < 0.5
@@ -203,20 +258,22 @@ def apply_mirror_augment(minibatch):
     minibatch[mask] = minibatch[mask, :, :, ::-1]
     return minibatch
 
-#----------------------------------------------------------------------------
+
+# ----------------------------------------------------------------------------
 # Size and contents of the image snapshot grids that are exported
 # periodically during training.
 
 def setup_snapshot_image_grid(G, training_set,
-    size    = '1080p',      # '1080p' = to be viewed on 1080p display, '4k' = to be viewed on 4k display.
-    layout  = 'row_per_class'):    # 'random' = grid contents are selected randomly, 'row_per_class' = each row corresponds to one class label.
-    #Set layout to random if random generation, or anything else for row = condition
+                              size='1080p',
+                              # '1080p' = to be viewed on 1080p display, '4k' = to be viewed on 4k display.
+                              layout='row_per_class'):  # 'random' = grid contents are selected randomly, 'row_per_class' = each row corresponds to one class label.
+    # Set layout to random if random generation, or anything else for row = condition
 
     layout = 'row_per_class'
-    #layout = 'random'
+    # layout = 'random'
     # Select size.
-    gw = 30; gh = 10
-
+    gw = 30;
+    gh = 10
 
     # Initialize data arrays.
     reals = np.zeros([gw * gh] + training_set.shape, dtype=training_set.dtype)
@@ -226,7 +283,7 @@ def setup_snapshot_image_grid(G, training_set,
     if layout == 'random':
         reals[:], labels[:] = training_set.get_minibatch_np(gw * gh)
 
-    class_layouts = dict(row_per_class=[gw,1], col_per_class=[1,gh], class4x4=[4,4])
+    class_layouts = dict(row_per_class=[gw, 1], col_per_class=[1, gh], class4x4=[4, 4])
 
     if layout != 'random':
         print("Conditional")
@@ -248,7 +305,7 @@ def setup_snapshot_image_grid(G, training_set,
             for j, (real, label) in enumerate(block):
                 print(j)
                 print("LABEL: ", label)
-                x = (i %  nw) * bw + j %  bw
+                x = (i % nw) * bw + j % bw
                 y = (i // nw) * bh + j // bw
                 if x < gw and y < gh:
                     reals[x + y * gw] = real[0]
@@ -256,4 +313,64 @@ def setup_snapshot_image_grid(G, training_set,
 
     return (gw, gh), reals, labels, latents
 
-#----------------------------------------------------------------------------
+
+# ----------------------------------------------------------------------------
+
+# Style Mixing Results
+
+
+def draw_style_mixing_figure(Gs, w, h, src_latents, dst_latents, style_ranges, synthesis_kwargs):
+    src_dlatents = Gs.components.mapping.run(src_latents, [[1, 0]] * len(src_latents))
+    dst_dlatents = Gs.components.mapping.run(dst_latents, [[0, 1]] * len(dst_latents))
+    src_images = Gs.components.synthesis.run(src_dlatents, randomize_noise=False, **synthesis_kwargs)
+    dst_images = Gs.components.synthesis.run(dst_dlatents, randomize_noise=False, **synthesis_kwargs)
+
+    canvas = PIL.Image.new('RGB', (w * (len(src_latents) + 1), h * (len(src_latents) + 1)), 'white')
+    for col, src_image in enumerate(list(src_images)):
+        canvas.paste(PIL.Image.fromarray(src_image, 'RGB'), ((col + 1) * w, 0))
+    for row, dst_image in enumerate(list(dst_images)):
+        canvas.paste(PIL.Image.fromarray(dst_image, 'RGB'), (0, (row + 1) * h))
+        row_dlatents = np.stack([dst_dlatents[row]] * len(src_latents))
+        row_dlatents[:, style_ranges[row]] = src_dlatents[:, style_ranges[row]]
+        row_images = Gs.components.synthesis.run(row_dlatents, randomize_noise=False, **synthesis_kwargs)
+        for col, image in enumerate(list(row_images)):
+            canvas.paste(PIL.Image.fromarray(image, 'RGB'), ((col + 1) * w, (row + 1) * h))
+    return canvas
+
+
+def save_style_mixing_image(Gs, run_dir, kimg, minibatch_size):
+    height, width = 256, 256
+    synthesis_kwargs = dict(output_transform=dict(func=tflib.convert_images_to_uint8, nchw_to_nhwc=True),
+                            minibatch_size=minibatch_size)
+
+    src_latents = np.random.randn(8, Gs.input_shape[1])
+    dst_latents = np.random.randn(8, Gs.input_shape[1])
+
+    middle_image = draw_style_mixing_figure(Gs, width, height, src_latents,
+                                            dst_latents,
+                                            [range(4, 8)] * len(src_latents), synthesis_kwargs)
+    fine_image = draw_style_mixing_figure(Gs, width, height, src_latents,
+                                          dst_latents,
+                                          [range(8, 14)] * len(src_latents), synthesis_kwargs)
+
+    image = get_concat_h(middle_image, fine_image)
+    image.save(os.path.join(run_dir, 'style-mixing-%d.png' % kimg))
+
+
+# ----------------------------------------------------------------------------
+
+def convert_1d_to_2d(l, cols):
+    return [l[i:i + cols] for i in range(0, len(l), cols)]
+
+
+def save_wj_image(Gs, run_dir, kimg):
+    img_list = []
+    for _ in range(25):
+        rnd = np.random.RandomState(None)
+        latents = rnd.randn(1, Gs.input_shape[1])
+        fmt = dict(func=tflib.convert_images_to_uint8, nchw_to_nhwc=True)
+        images = Gs.run(latents, [[1, 1]], randomize_noise=False, output_transform=fmt)
+        img_list.append(PIL.Image.fromarray(images[0], 'RGB'))
+
+    img_list_2d = convert_1d_to_2d(img_list, 5)
+    get_concat_tile(img_list_2d).save(os.path.join(run_dir, 'wj-%d.png' % kimg))

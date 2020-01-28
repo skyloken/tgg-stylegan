@@ -19,18 +19,26 @@ import config
 from training import misc
 from training import dataset
 
-#----------------------------------------------------------------------------
+# ----------------------------------------------------------------------------
 # Standard metrics.
 
-fid50k = dnnlib.EasyDict(func_name='metrics.frechet_inception_distance.FID', name='fid50k', num_images=50000, minibatch_per_gpu=8)
-ppl_zfull = dnnlib.EasyDict(func_name='metrics.perceptual_path_length.PPL', name='ppl_zfull', num_samples=100000, epsilon=1e-4, space='z', sampling='full', minibatch_per_gpu=16)
-ppl_wfull = dnnlib.EasyDict(func_name='metrics.perceptual_path_length.PPL', name='ppl_wfull', num_samples=100000, epsilon=1e-4, space='w', sampling='full', minibatch_per_gpu=16)
-ppl_zend = dnnlib.EasyDict(func_name='metrics.perceptual_path_length.PPL', name='ppl_zend', num_samples=100000, epsilon=1e-4, space='z', sampling='end', minibatch_per_gpu=16)
-ppl_wend = dnnlib.EasyDict(func_name='metrics.perceptual_path_length.PPL', name='ppl_wend', num_samples=100000, epsilon=1e-4, space='w', sampling='end', minibatch_per_gpu=16)
-ls = dnnlib.EasyDict(func_name='metrics.linear_separability.LS', name='ls', num_samples=200000, num_keep=100000, attrib_indices=range(40), minibatch_per_gpu=4)
-dummy = dnnlib.EasyDict(func_name='metrics.metric_base.DummyMetric', name='dummy') # for debugging
+fid50k = dnnlib.EasyDict(func_name='metrics.frechet_inception_distance.FID', name='fid50k', num_images=50000,
+                         minibatch_per_gpu=8)
+tggfid = dnnlib.EasyDict(func_name='metrics.tgg_fid.TGG_FID', name='tggfid', num_images=5000, minibatch_per_gpu=8)
+ppl_zfull = dnnlib.EasyDict(func_name='metrics.perceptual_path_length.PPL', name='ppl_zfull', num_samples=100000,
+                            epsilon=1e-4, space='z', sampling='full', minibatch_per_gpu=16)
+ppl_wfull = dnnlib.EasyDict(func_name='metrics.perceptual_path_length.PPL', name='ppl_wfull', num_samples=100000,
+                            epsilon=1e-4, space='w', sampling='full', minibatch_per_gpu=16)
+ppl_zend = dnnlib.EasyDict(func_name='metrics.perceptual_path_length.PPL', name='ppl_zend', num_samples=100000,
+                           epsilon=1e-4, space='z', sampling='end', minibatch_per_gpu=16)
+ppl_wend = dnnlib.EasyDict(func_name='metrics.perceptual_path_length.PPL', name='ppl_wend', num_samples=100000,
+                           epsilon=1e-4, space='w', sampling='end', minibatch_per_gpu=16)
+ls = dnnlib.EasyDict(func_name='metrics.linear_separability.LS', name='ls', num_samples=200000, num_keep=100000,
+                     attrib_indices=range(40), minibatch_per_gpu=4)
+dummy = dnnlib.EasyDict(func_name='metrics.metric_base.DummyMetric', name='dummy')  # for debugging
 
-#----------------------------------------------------------------------------
+
+# ----------------------------------------------------------------------------
 # Base class for metrics.
 
 class MetricBase:
@@ -42,7 +50,8 @@ class MetricBase:
         self._results = []
         self._eval_time = None
 
-    def run(self, network_pkl, run_dir=None, dataset_args=None, mirror_augment=None, num_gpus=1, tf_config=None, log_results=True):
+    def run(self, network_pkl, run_dir=None, dataset_args=None, mirror_augment=None, num_gpus=1, tf_config=None,
+            log_results=True):
         self._network_pkl = network_pkl
         self._dataset_args = dataset_args
         self._mirror_augment = mirror_augment
@@ -55,7 +64,8 @@ class MetricBase:
             self._mirror_augment = run_config['train'].get('mirror_augment', False)
 
         time_begin = time.time()
-        with tf.Graph().as_default(), tflib.create_session(tf_config).as_default(): # pylint: disable=not-context-manager
+        with tf.Graph().as_default(), tflib.create_session(
+                tf_config).as_default():  # pylint: disable=not-context-manager
             _G, _D, Gs = misc.load_pkl(self._network_pkl)
             self._evaluate(Gs, num_gpus=num_gpus)
         self._eval_time = time.time() - time_begin
@@ -85,7 +95,7 @@ class MetricBase:
             tflib.autosummary.autosummary('Metrics/' + self.name + res.suffix, res.value)
 
     def _evaluate(self, Gs, num_gpus):
-        raise NotImplementedError # to be overridden by subclasses
+        raise NotImplementedError  # to be overridden by subclasses
 
     def _report_result(self, value, suffix='', fmt='%-10.4f'):
         self._results += [dnnlib.EasyDict(value=value, suffix=suffix, fmt=fmt)]
@@ -106,14 +116,29 @@ class MetricBase:
                 images = misc.apply_mirror_augment(images)
             yield images
 
+    def _iterate_reals_for_label(self, minibatch_size, label):
+        if label == [1, 0]:
+            tfrecord_dir = 'wallpaper_256_wst'
+        elif label == [0, 1]:
+            tfrecord_dir = 'wallpaper_256_jpn'
+        dataset_obj = dataset.load_dataset(data_dir=config.data_dir, tfrecord_dir=tfrecord_dir, shuffle_mb=0)
+
+        while True:
+            images, _labels = dataset_obj.get_minibatch_np(minibatch_size)
+            if self._mirror_augment:
+                images = misc.apply_mirror_augment(images)
+            yield images
+
     def _iterate_fakes(self, Gs, minibatch_size, num_gpus):
         while True:
             latents = np.random.randn(minibatch_size, *Gs.input_shape[1:])
             fmt = dict(func=tflib.convert_images_to_uint8, nchw_to_nhwc=True)
-            images = Gs.run(latents, None, truncation_psi=0.7, output_transform=fmt, is_validation=True, num_gpus=num_gpus, assume_frozen=True)
+            images = Gs.run(latents, None, truncation_psi=0.7, output_transform=fmt, is_validation=True,
+                            num_gpus=num_gpus, assume_frozen=True)
             yield images
 
-#----------------------------------------------------------------------------
+
+# ----------------------------------------------------------------------------
 # Group of multiple metrics.
 
 class MetricGroup:
@@ -131,7 +156,8 @@ class MetricGroup:
         for metric in self.metrics:
             metric.update_autosummaries()
 
-#----------------------------------------------------------------------------
+
+# ----------------------------------------------------------------------------
 # Dummy metric for debugging purposes.
 
 class DummyMetric(MetricBase):
@@ -139,4 +165,4 @@ class DummyMetric(MetricBase):
         _ = Gs, num_gpus
         self._report_result(0.0)
 
-#----------------------------------------------------------------------------
+# ----------------------------------------------------------------------------
