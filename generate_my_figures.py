@@ -8,7 +8,7 @@ import config
 from training import misc
 from generate_figures import *
 
-run_id = 31
+run_id = 0
 snapshot = None
 width = 256
 height = 256
