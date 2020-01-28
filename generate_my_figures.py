@@ -7,7 +7,7 @@ import dnnlib.tflib as tflib
 import config
 from training import misc
 
-run_id = 1
+run_id = 0
 snapshot = None
 width = 256
 height = 256
@@ -58,12 +58,9 @@ def generate_figures(Gs, gen_num=100, truncation_psi=0.7, truncation_cutoff=8, r
         PIL.Image.fromarray(images[0], 'RGB').save(png_filename)
 
 
-def generate_mixings(Gs, gen_num=100, truncation_psi=0.7, randomize_noise=True):
+def generate_mixings(Gs, style_range, src_label=[1, 0], gen_num=100, truncation_psi=0.7, randomize_noise=True):
     dlatent_avg = Gs.get_var('dlatent_avg')
 
-    # Middle
-    middle_style_range = range(4, 8)
-    fine_style_range = range(8, 14)
     for i in range(gen_num):
         # Pick latent vector.
         rand = np.random.RandomState(i)
@@ -77,21 +74,20 @@ def generate_mixings(Gs, gen_num=100, truncation_psi=0.7, randomize_noise=True):
         jpn_dlatents = (jpn_dlatents - dlatent_avg) * np.reshape([truncation_psi], [-1, 1, 1]) + dlatent_avg
 
         # Style Mixing
-        middle_dlatents = np.copy(wst_dlatents)
-        middle_dlatents[:, middle_style_range] = jpn_dlatents[:, middle_style_range]
-        middle_images = Gs.components.synthesis.run(middle_dlatents, randomize_noise=False, **synthesis_kwargs)
-        fine_dlatents = np.copy(wst_dlatents)
-        fine_dlatents[:, fine_style_range] = jpn_dlatents[:, fine_style_range]
-        fine_images = Gs.components.synthesis.run(fine_dlatents, randomize_noise=False, **synthesis_kwargs)
+        if src_label == [1, 0]:
+            dlatents = np.copy(jpn_dlatents)
+            dlatents[:, style_range] = wst_dlatents[:, style_range]
+        elif src_label == [0, 1]:
+            dlatents = np.copy(wst_dlatents)
+            dlatents[:, style_range] = jpn_dlatents[:, style_range]
+        images = Gs.components.synthesis.run(dlatents, randomize_noise=False, **synthesis_kwargs)
 
         # Save
+        dir_name = 'style_mixing-{0}-{1}-psi{2}'.format(src_label, style_range, truncation_psi)
         os.makedirs(config.output_dir, exist_ok=True)
-        os.makedirs(os.path.join(config.output_dir, 'middle_mixings'), exist_ok=True)
-        PIL.Image.fromarray(middle_images[0], 'RGB').save(
-            os.path.join(config.output_dir, 'middle_mixings', 'gen_%s.png' % i))
-        os.makedirs(os.path.join(config.output_dir, 'fine_mixings'), exist_ok=True)
-        PIL.Image.fromarray(fine_images[0], 'RGB').save(
-            os.path.join(config.output_dir, 'fine_mixings', 'gen_%s.png' % i))
+        os.makedirs(os.path.join(config.output_dir, dir_name), exist_ok=True)
+        PIL.Image.fromarray(images[0], 'RGB').save(
+            os.path.join(config.output_dir, dir_name, 'gen_%s.png' % i))
 
 
 def draw_color_conditions(Gs, src_seed, label):
@@ -211,8 +207,9 @@ def main():
 
     # Generate figures.
     os.makedirs(config.output_dir, exist_ok=True)
-    generate_figures(Gs, gen_num=100, truncation_psi=0.7, truncation_cutoff=8, randomize_noise=True)
-    generate_mixings(Gs, gen_num=100, truncation_psi=0.7, randomize_noise=True)
+    # generate_figures(Gs, gen_num=100, truncation_psi=0.7, truncation_cutoff=8, randomize_noise=True)
+    # generate_mixings(Gs, style_range=range(0, 10), src_label=[1, 0], gen_num=500, truncation_psi=1.0, randomize_noise=True)
+    generate_mixings(Gs, style_range=range(0, 7), src_label=[0, 1], gen_num=500, truncation_psi=0.7, randomize_noise=True)
 
     # draw_western_and_japanese_style_mixing_figure(os.path.join(config.output_dir, 'style-mixing-coarse.png'), Gs, w=width, h=height, src_seeds=[639,701,687,615,2268], dst_seeds=[888,829,1898,1733,1614,845], style_ranges=[range(0,4)]*6)
     # draw_western_and_japanese_style_mixing_figure(os.path.join(config.output_dir, 'style-mixing-middle.png'), Gs, w=width, h=height, src_seeds=[639,701,687,615,2268], dst_seeds=[888,829,1898,1733,1614,845], style_ranges=[range(4,8)]*6)
