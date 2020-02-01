@@ -17,6 +17,7 @@ import numpy as np
 import scipy
 import tensorflow as tf
 import dnnlib.tflib as tflib
+import config
 
 from metrics import metric_base
 from training import misc
@@ -32,8 +33,8 @@ class FID(metric_base.MetricBase):
 
     def _evaluate(self, Gs, num_gpus):
         minibatch_size = num_gpus * self.minibatch_per_gpu
-        inception = misc.load_pkl(
-            'https://drive.google.com/uc?id=1MzTY44rLToO5APn8TZmfR7_ENSe5aZUn')  # inception_v3_features.pkl
+        # inception = misc.load_pkl('https://drive.google.com/uc?id=1MzTY44rLToO5APn8TZmfR7_ENSe5aZUn')  # inception_v3_features.pkl
+        inception = misc.load_pkl(os.path.join(config.data_dir, '..', 'data', 'inception_v3_features.pkl'))
         activations = np.empty([self.num_images, inception.output_shape[1]], dtype=np.float32)
 
         # Calculate statistics for reals.

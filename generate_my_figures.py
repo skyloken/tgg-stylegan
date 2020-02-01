@@ -6,6 +6,7 @@ import numpy as np
 import config
 import dnnlib.tflib as tflib
 from training import misc
+from generate_figures import draw_uncurated_result_figure, draw_noise_detail_figure, draw_noise_components_figure, draw_truncation_trick_figure
 
 run_id = 0
 snapshot = None
@@ -89,6 +90,36 @@ def generate_mixings(Gs, style_range, src_label=[1, 0], gen_num=100, truncation_
         PIL.Image.fromarray(images[0], 'RGB').save(
             os.path.join(config.output_dir, dir_name, 'gen_%s.png' % i))
 
+def mix_balance_detail(png, Gs, src_label, seeds, truncation_psi=1.0, randomize_noise=False):
+    print(png)
+
+    dlatent_avg = Gs.get_var('dlatent_avg')
+    style_ranges = [range(0, i) for i in range(14, -1, -1)]
+
+    canvas = PIL.Image.new('RGB', (width * 15, height * len(seeds)), 'white')
+    for row, seed in enumerate(seeds):
+        for col, style_range in enumerate(style_ranges):
+            # Pick latent vector.
+            rand = np.random.RandomState(seed)
+            wst_latents = rand.randn(1, Gs.input_shape[1])
+            jpn_latents = rand.randn(1, Gs.input_shape[1])
+            wst_dlatents = Gs.components.mapping.run(wst_latents, [[1, 0]])
+            jpn_dlatents = Gs.components.mapping.run(jpn_latents, [[0, 1]])
+
+            # Truncation trick
+            wst_dlatents = (wst_dlatents - dlatent_avg) * np.reshape([truncation_psi], [-1, 1, 1]) + dlatent_avg
+            jpn_dlatents = (jpn_dlatents - dlatent_avg) * np.reshape([truncation_psi], [-1, 1, 1]) + dlatent_avg
+
+            # Style Mixing
+            if src_label == [1, 0]:
+                dlatents = np.copy(jpn_dlatents)
+                dlatents[:, style_range] = wst_dlatents[:, style_range]
+            elif src_label == [0, 1]:
+                dlatents = np.copy(wst_dlatents)
+                dlatents[:, style_range] = jpn_dlatents[:, style_range]
+            images = Gs.components.synthesis.run(dlatents, randomize_noise=randomize_noise, **synthesis_kwargs)
+            canvas.paste(PIL.Image.fromarray(images[0], 'RGB'), ((col * width), (row * height)))
+    canvas.save(png)
 
 # ----------------------------------------------------------------------------
 # Western and Japanese style mixing.
@@ -166,6 +197,33 @@ def draw_style_detail(png, Gs, w, h, label, src_seed, dst_seeds, style_range):
             canvas.paste(PIL.Image.fromarray(image, 'RGB'), ((col + 1) * w, (row + 1) * h))
     canvas.save(png)
 
+def discriminator_test(Gs, D):
+
+    def sigmoid(x):
+        return 1.0 / (1.0 + np.exp(-x)) 
+    def avg(l):
+        return sum(l) / len(l)
+
+    ww_scores = []
+    wj_scores = []
+    jw_scores = []
+    jj_scores = []
+    for i in range(5000):
+        # Pick latent vector.
+        latents = np.random.RandomState(i).randn(1, Gs.input_shape[1])
+
+        # Generate image.
+        wst_images = Gs.run(latents, [[1, 0]])
+        jpn_images = Gs.run(latents, [[0, 1]])
+        
+        ww_scores.append(sigmoid(D.run(wst_images, [[1, 0]])[0]))
+        wj_scores.append(sigmoid(D.run(wst_images, [[0, 1]])[0]))
+        jw_scores.append(sigmoid(D.run(jpn_images, [[1, 0]])[0]))
+        jj_scores.append(sigmoid(D.run(jpn_images, [[0, 1]])[0]))
+    print('ww', avg(ww_scores))
+    print('wj', avg(wj_scores))
+    print('jw', avg(jw_scores))
+    print('jj', avg(jj_scores))
 
 def main():
     # Initialize TensorFlow.
@@ -184,10 +242,14 @@ def main():
 
     # Generate figures.
     os.makedirs(config.output_dir, exist_ok=True)
+
+    # discriminator_test(Gs, D)
+
     # generate_figures(Gs, gen_num=100, truncation_psi=0.7, truncation_cutoff=8, randomize_noise=True)
     # generate_mixings(Gs, style_range=range(0, 10), src_label=[1, 0], gen_num=500, truncation_psi=1.0, randomize_noise=True)
-    generate_mixings(Gs, style_range=range(0, 7), src_label=[0, 1], gen_num=500, truncation_psi=0.7,
-                     randomize_noise=True)
+    # generate_mixings(Gs, style_range=range(0, 7), src_label=[0, 1], gen_num=500, truncation_psi=0.7, randomize_noise=True)
+    # mix_balance_detail(os.path.join(config.output_dir, 'mix_balance_detail_wj.png'), Gs, src_label=[1, 0], seeds=[109, 134, 139, 165, 224, 281, 432, 454])
+    # mix_balance_detail(os.path.join(config.output_dir, 'mix_balance_detail_jw.png'), Gs, src_label=[0, 1], seeds=[109, 134, 139, 165, 224, 281, 432, 454])
 
     # draw_western_and_japanese_style_mixing_figure(os.path.join(config.output_dir, 'style-mixing-coarse.png'), Gs, w=width, h=height, src_seeds=[639,701,687,615,2268], dst_seeds=[888,829,1898,1733,1614,845], style_ranges=[range(0,4)]*6)
     # draw_western_and_japanese_style_mixing_figure(os.path.join(config.output_dir, 'style-mixing-middle.png'), Gs, w=width, h=height, src_seeds=[639,701,687,615,2268], dst_seeds=[888,829,1898,1733,1614,845], style_ranges=[range(4,8)]*6)
@@ -206,13 +268,17 @@ def main():
     # draw_style_detail(os.path.join(config.output_dir, 'style-detail-4.png'), Gs, w=width, h=height, label=[1, 0, 0, 0, 0], src_seed=223, dst_seeds=[5, 9, 13, 36, 111, 113, 245, 248], style_range=4)
     # draw_style_detail(os.path.join(config.output_dir, 'style-detail-5.png'), Gs, w=width, h=height, label=[1, 0, 0, 0, 0], src_seed=223, dst_seeds=[5, 9, 13, 36, 111, 113, 245, 248], style_range=5)
 
-    # draw_uncurated_result_figure(os.path.join(config.output_dir, 'uncurated.png'), Gs, cx=0, cy=0, cw=width, ch=height, rows=3, lods=[0,1,2,2,3,3], seed=5)
+    # draw_uncurated_result_figure(os.path.join(config.output_dir, 'uncurated.png'), Gs, cx=0, cy=0, cw=width, ch=height, rows=3, lods=[0,1,2,2,3,3], seed=5, label=None)
+    # for i in range(100):
+    #     draw_uncurated_result_figure(os.path.join(config.output_dir, 'uncurated-wst-%s.png' % i), Gs, cx=0, cy=0, cw=width, ch=height, rows=3, lods=[0,1,2,2,3,3], seed=i, label=[1, 0])  # 20
+    #     draw_uncurated_result_figure(os.path.join(config.output_dir, 'uncurated-jpn-%s.png' % i), Gs, cx=0, cy=0, cw=width, ch=height, rows=3, lods=[0,1,2,2,3,3], seed=i, label=[0, 1])  # 20
     # draw_style_mixing_figure(os.path.join(config.output_dir, 'style-mixing-coarse.png'), Gs, w=width, h=height, src_seeds=[639,701,687,615,2268], dst_seeds=[888,829,1898,1733,1614,845], style_ranges=[range(0,4)]*6)
     # draw_style_mixing_figure(os.path.join(config.output_dir, 'style-mixing-middle.png'), Gs, w=width, h=height, src_seeds=[639,701,687,615,2268], dst_seeds=[888,829,1898,1733,1614,845], style_ranges=[range(4,8)]*6)
     # draw_style_mixing_figure(os.path.join(config.output_dir, 'style-mixing-fine.png'), Gs, w=width, h=height, src_seeds=[639,701,687,615,2268], dst_seeds=[888,829,1898,1733,1614,845], style_ranges=[range(8,14)]*6)
     # draw_noise_detail_figure(os.path.join(config.output_dir, 'noise-detail.png'), Gs, w=width, h=height, num_samples=100, seeds=[1157,1012])
     # draw_noise_components_figure(os.path.join(config.output_dir, 'noise-components.png'), Gs, w=width, h=height, seeds=[1967,1555], noise_ranges=[range(0, 18), range(0, 0), range(8, 18), range(0, 8)], flips=[1])
-    # draw_truncation_trick_figure(os.path.join(config.output_dir, 'truncation-trick.png'), Gs, w=width, h=height, seeds=[91,388], psis=[1, 0.7, 0.5, 0, -0.5, -1])
+    # draw_truncation_trick_figure(os.path.join(config.output_dir, 'truncation-trick-wst.png'), Gs, w=width, h=height, seeds=[81,175,186,206], psis=[1, 0.7, 0.5, 0, -0.5, -1], labels=[[1, 0]]*4)
+    # draw_truncation_trick_figure(os.path.join(config.output_dir, 'truncation-trick-jpn.png'), Gs, w=width, h=height, seeds=[7,40,61,100], psis=[1, 0.7, 0.5, 0, -0.5, -1], labels=[[0, 1]]*4)
     # draw_transition_figure(os.path.join(config.output_dir, 'transition_%s_to_%s.gif' % (9, 16)), Gs, w=width, h=height, src_seed=9, dst_seed=16)
 
 

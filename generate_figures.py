@@ -48,12 +48,16 @@ def load_Gs(url):
 # ----------------------------------------------------------------------------
 # Figures 2, 3, 10, 11, 12: Multi-resolution grid of uncurated result images.
 
-def draw_uncurated_result_figure(png, Gs, cx, cy, cw, ch, rows, lods, seed):
+def draw_uncurated_result_figure(png, Gs, cx, cy, cw, ch, rows, lods, seed, label):
     print(png)
     latents = np.random.RandomState(seed).randn(sum(rows * 2 ** lod for lod in lods), Gs.input_shape[1])
-    a = np.random.randint(0, 10, sum(rows * 2 ** lod for lod in lods))
-    labels = np.zeros((a.shape[0], a.max() + 1))
-    labels[np.arange(len(a)), a] = 1
+    a = np.random.randint(0, 2, sum(rows * 2 ** lod for lod in lods))
+
+    if not label:
+        labels = np.zeros((a.shape[0], a.max() + 1))
+        labels[np.arange(len(a)), a] = 1
+    else:
+        labels = [label] * len(latents)
 
     images = Gs.run(latents, labels, **synthesis_kwargs)  # [seed, y, x, rgb]
     # images = Gs.run(latents, None, **synthesis_kwargs) # [seed, y, x, rgb]
@@ -118,17 +122,10 @@ def draw_noise_components_figure(png, Gs, w, h, seeds, noise_ranges, flips):
 # ----------------------------------------------------------------------------
 # Figure 8: Truncation trick.
 
-def draw_truncation_trick_figure(png, Gs, w, h, seeds, psis, labels_exist):
+def draw_truncation_trick_figure(png, Gs, w, h, seeds, psis, labels):
     print(png)
     latents = np.stack(np.random.RandomState(seed).randn(Gs.input_shape[1]) for seed in seeds)
-
-    if labels_exist == True:
-        a = np.random.randint(0, 10, len(seeds))
-        labels = np.zeros((a.shape[0], a.max() + 1))
-        labels[np.arange(len(a)), a] = 1
-        dlatents = Gs.components.mapping.run(latents, labels)  # [seed, layer, component]
-    else:
-        dlatents = Gs.components.mapping.run(latents, None)  # [seed, layer, component]
+    dlatents = Gs.components.mapping.run(latents, labels)  # [seed, layer, component]
     dlatent_avg = Gs.get_var('dlatent_avg')  # [component]
 
     canvas = PIL.Image.new('RGB', (w * len(psis), h * len(seeds)), 'white')

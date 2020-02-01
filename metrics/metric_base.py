@@ -24,6 +24,8 @@ from training import dataset
 
 fid50k = dnnlib.EasyDict(func_name='metrics.frechet_inception_distance.FID', name='fid50k', num_images=50000,
                          minibatch_per_gpu=8)
+fid5k = dnnlib.EasyDict(func_name='metrics.frechet_inception_distance.FID', name='fid5k', num_images=5000,
+                         minibatch_per_gpu=8)                    
 tggfid = dnnlib.EasyDict(func_name='metrics.tgg_fid.TGG_FID', name='tggfid', num_images=5000, minibatch_per_gpu=8)
 ppl_zfull = dnnlib.EasyDict(func_name='metrics.perceptual_path_length.PPL', name='ppl_zfull', num_samples=100000,
                             epsilon=1e-4, space='z', sampling='full', minibatch_per_gpu=16)
@@ -117,10 +119,14 @@ class MetricBase:
             yield images
 
     def _iterate_reals_for_label(self, minibatch_size, label):
+
+        # TODO: Please change
         if label == [1, 0]:
-            tfrecord_dir = 'wallpaper_256_wst'
+            # tfrecord_dir = 'wallpaper_256_wst'
+            tfrecord_dir = 'wallpaper2_256_wst'
         elif label == [0, 1]:
-            tfrecord_dir = 'wallpaper_256_jpn'
+            # tfrecord_dir = 'wallpaper_256_jpn'
+            tfrecord_dir = 'wallpaper2_256_jpn'
         dataset_obj = dataset.load_dataset(data_dir=config.data_dir, tfrecord_dir=tfrecord_dir, shuffle_mb=0)
 
         while True:

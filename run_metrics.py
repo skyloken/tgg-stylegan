@@ -70,14 +70,16 @@ def main():
     submit_config = dnnlib.SubmitConfig()
 
     # Config
-    run_id = 0
-    snapshot = None
+    run_id = 1
+    snapshot = 35200
     network_pkl = misc.locate_network_pkl(run_id, snapshot)
-    tfrecord_dir = 'wallpaper_256'
+    # tfrecord_dir = 'wallpaper_256'
+    tfrecord_dir = 'wallpaper2_256'
 
     # Which metrics to evaluate?
     metrics = []
     # metrics += [metric_base.fid50k]
+    # metrics += [metric_base.fid5k]
     metrics += [metric_base.tggfid]
     # metrics += [metric_base.ppl_zfull]
     # metrics += [metric_base.ppl_wfull]
