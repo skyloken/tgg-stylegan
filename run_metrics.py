@@ -17,6 +17,7 @@ import dnnlib.tflib as tflib
 import config
 from metrics import metric_base
 from training import misc
+import glob
 
 
 # ----------------------------------------------------------------------------
@@ -70,17 +71,17 @@ def main():
     submit_config = dnnlib.SubmitConfig()
 
     # Config
-    run_id = 1
-    snapshot = 35200
+    run_id = 0
+    snapshot = None
     network_pkl = misc.locate_network_pkl(run_id, snapshot)
     # tfrecord_dir = 'wallpaper_256'
-    tfrecord_dir = 'wallpaper2_256'
+    tfrecord_dir = 'wallpaper_256'
 
     # Which metrics to evaluate?
     metrics = []
     # metrics += [metric_base.fid50k]
-    # metrics += [metric_base.fid5k]
-    metrics += [metric_base.tggfid]
+    metrics += [metric_base.fid5k]
+    # metrics += [metric_base.tggfid]
     # metrics += [metric_base.ppl_zfull]
     # metrics += [metric_base.ppl_wfull]
     # metrics += [metric_base.ppl_zend]
@@ -92,6 +93,11 @@ def main():
     tasks = []
     tasks += [EasyDict(run_func_name='run_metrics.run_pickle', network_pkl=network_pkl,
                        dataset_args=EasyDict(tfrecord_dir=tfrecord_dir, shuffle_mb=0), mirror_augment=True)]
+
+    """ pkls = misc.list_network_pkls(run_id)
+    for i, pkl in enumerate(pkls):
+        tasks += [EasyDict(run_func_name='run_metrics.run_pickle', network_pkl=pkl,
+                       dataset_args=EasyDict(tfrecord_dir=tfrecord_dir, shuffle_mb=0), mirror_augment=True)] """
 
     # How many GPUs to use?
     submit_config.num_gpus = 1

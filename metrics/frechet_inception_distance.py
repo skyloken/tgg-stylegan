@@ -60,7 +60,8 @@ class FID(metric_base.MetricBase):
                 Gs_clone = Gs.clone()
                 inception_clone = inception.clone()
 
-                labels_exist = input("Labelled Data? [True/False] ")
+                # labels_exist = input("Labelled Data? [True/False] ")
+                labels_exist = True
                 if labels_exist == True:
                     a = np.random.randint(0, 2, self.minibatch_per_gpu)
                     labels = np.zeros((a.shape[0], a.max() + 1))

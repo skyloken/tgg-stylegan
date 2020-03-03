@@ -19,9 +19,9 @@ from metrics import metric_base
 
 if 1:
     desc = 'sgan'  # Description string included in result subdir name.
-    train         = EasyDict(run_func_name='training.training_loop.training_loop')         # Options for training loop.
-    # train = EasyDict(run_func_name='training.training_loop.training_loop', network_snapshot_ticks=2, resume_run_id='latest')  # Options for training loop.
-    # train         = EasyDict(run_func_name='training.training_loop.training_loop', network_snapshot_ticks=2, resume_run_id=24, resume_kimg=4941)         # Options for training loop.
+    # train         = EasyDict(run_func_name='training.training_loop.training_loop')         # Options for training loop.
+    # train = EasyDict(run_func_name='training.training_loop.training_loop', resume_run_id='latest')  # Options for training loop.
+    train         = EasyDict(run_func_name='training.training_loop.training_loop', resume_run_id=6, resume_snapshot=35200, resume_kimg=35200)         # Options for training loop.
     G = EasyDict(func_name='training.networks_stylegan.G_style')  # Options for generator network.
     D = EasyDict(func_name='training.networks_stylegan.D_basic')  # Options for discriminator network.
     G_opt = EasyDict(beta1=0.0, beta2=0.99, epsilon=1e-8)  # Options for generator optimizer.
@@ -32,7 +32,7 @@ if 1:
     sched = EasyDict()  # Options for TrainingSchedule.
     grid = EasyDict(size='4k', layout='random')  # Options for setup_snapshot_image_grid().
     # metrics       = [metric_base.fid50k]                                                   # Options for MetricGroup.
-    metrics = []
+    metrics = [metric_base.fid5k]
     submit_config = dnnlib.SubmitConfig()  # Options for dnnlib.submit_run().
     tf_config = {'rnd.np_random_seed': 1000}  # Options for tflib.init_tf().
 
@@ -48,7 +48,7 @@ if 1:
     sched.minibatch_dict = {4: 128, 8: 128, 16: 128, 32: 64, 64: 32, 128: 16, 256: 8, 512: 4}
 
     # Default options.
-    train.total_kimg = 30000
+    train.total_kimg = 40000
     sched.lod_initial_resolution = 8
     sched.G_lrate_dict = {128: 0.0015, 256: 0.002, 512: 0.003, 1024: 0.003}
     sched.D_lrate_dict = EasyDict(sched.G_lrate_dict)

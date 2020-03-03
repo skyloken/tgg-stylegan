@@ -11,9 +11,10 @@ import dnnlib.tflib as tflib
 from training import misc
 
 seed = 100
-# run_id = 0
-run_id = 1
-snapshot = 32000
+run_id = 0
+snapshot = 30000
+# run_id = 1
+# snapshot = 32000
 width = 512
 height = 512
 fmt = dict(func=tflib.convert_images_to_uint8, nchw_to_nhwc=True)
