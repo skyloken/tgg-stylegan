@@ -12,6 +12,8 @@ scipy = "*"
 requests = "*"
 pillow = "*"
 pandas = "*"
+flask = "*"
+flask-cors = "*"
 
 [requires]
 python_version = "3.7"
