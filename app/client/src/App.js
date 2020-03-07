@@ -1,26 +1,19 @@
 import React from 'react';
-import logo from './logo.svg';
+import { Box, Container, CssBaseline, Divider } from '@material-ui/core';
 import './App.css';
-import Image from './components/Image'
+import GeneratePage from './components/GeneratePage';
+import MixPage from './components/MixPage';
+
 
 function App() {
   return (
     <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.js</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
-      <Image/>
+      <CssBaseline />
+      <Container fixed>
+        <GeneratePage />
+        <Divider />
+        <MixPage />
+      </Container>
     </div>
   );
 }
