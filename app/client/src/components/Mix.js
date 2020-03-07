@@ -1,11 +1,10 @@
 
 import React from 'react';
-import { Slider } from '@material-ui/core';
-import GeneratedImage from './GeneratedImage';
+import { Typography, Slider, Box } from '@material-ui/core';
 import Image from './Image';
 
 
-class MixPage extends React.Component {
+class Mix extends React.Component {
 
     state = {
         mixedImages: [],
@@ -35,7 +34,10 @@ class MixPage extends React.Component {
         console.log(this.state);
         return (
             <>
-                <Image base64={this.state.mixedImages[this.state.mix_index]} />
+                <Typography variant="h5" align='center' gutterBottom>Mixed style</Typography>
+                <Image base64={this.state.mixedImages[this.state.mix_index]} width='100%' />
+                <Box m={5} />
+                <Typography>Mixing ratio</Typography>
                 <Slider
                     value={this.state.mix_index}
                     aria-labelledby="discrete-slider"
@@ -55,4 +57,4 @@ class MixPage extends React.Component {
 
 }
 
-export default MixPage;
+export default Mix;

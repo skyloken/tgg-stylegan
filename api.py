@@ -5,11 +5,14 @@ import base64
 
 import numpy as np
 
+from service import TakedaGoichiGenerator
+
+# tgg = TakedaGoichiGenerator()
 
 def generate_figure():
     """mock"""
     latent = np.random.randn(512)
-    image = Image.new("RGB", (256, 256), (256, 0, 256))
+    image = Image.new("RGB", (256, 256), (0, 0, 256))
 
     return latent, image
 
@@ -36,11 +39,14 @@ def img_to_base64(img):
 @app.route('/generate')
 def generate():
     gen_num = int(request.args.get('n'))
+    style = request.args.get('style')
+    label = [1, 0] if style == 'western' else [0, 1]
 
     generated_images = []
     buffer = BytesIO()
     for _ in range(gen_num):
         latent, image = generate_figure()
+        # latent, image = tgg.generate_figure()
         generated_images.append({
             'latent': str(latent.tolist()),
             'base64': img_to_base64(image)
@@ -54,8 +60,9 @@ def style_mix():
     latent1 = request.args.get('latent1')
     latent2 = request.args.get('latent2')
 
-    # TODO: Style mixing
+    # Style mixing
     mixed_images = mix_styles(latent1, latent2)
+    # mixed_images = tgg.mix_styles(latent1, latent2)
 
     return jsonify(list(map(img_to_base64, mixed_images)))
 
