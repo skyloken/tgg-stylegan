@@ -44,7 +44,7 @@ app = Flask(__name__)
 
 def img_to_base64(img):
     buffer = BytesIO()
-    img.save(buffer, format='png')
+    img.save(buffer, format='jpeg')
     return base64.b64encode(buffer.getvalue()).decode('utf-8')
 
 
