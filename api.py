@@ -1,13 +1,19 @@
-from flask import Flask, jsonify, request
-from PIL import Image, ImageDraw
-from io import BytesIO
 import base64
+from io import BytesIO
 
 import numpy as np
+import tensorflow as tf
+from flask import Flask, jsonify, request
+from flask_injector import FlaskInjector
+from injector import inject, singleton
+from PIL import Image, ImageDraw
 
+import dnnlib.tflib as tflib
 from service import TakedaGoichiGenerator
 
-# tgg = TakedaGoichiGenerator()
+global tgg, graph
+tgg = TakedaGoichiGenerator()
+graph = tf.get_default_graph()
 
 def generate_figure():
     """mock"""
@@ -35,6 +41,13 @@ def img_to_base64(img):
     img.save(buffer, format='png')
     return base64.b64encode(buffer.getvalue()).decode('utf-8')
 
+@app.route('/test')
+def test():
+    with graph.as_default():
+        latent, image = tgg.generate_figure([1, 0])
+    return jsonify({
+        'image': img_to_base64(image)
+    })
 
 @app.route('/generate')
 def generate():
@@ -45,8 +58,9 @@ def generate():
     generated_images = []
     buffer = BytesIO()
     for _ in range(gen_num):
-        latent, image = generate_figure()
-        # latent, image = tgg.generate_figure()
+        # latent, image = generate_figure()
+        with graph.as_default():
+            latent, image = tgg.generate_figure(label)
         generated_images.append({
             'latent': base64.b64encode(latent.tobytes()).decode('utf-8'),
             'base64': img_to_base64(image)
@@ -54,19 +68,19 @@ def generate():
 
     return jsonify(generated_images)
 
-
 @app.route('/mix', methods=['POST'])
 def style_mix():
+    # print(tgg)
     body = request.get_json()
     wst_latent = np.frombuffer(base64.b64decode(body['wstLatent']))
     jpn_latent = np.frombuffer(base64.b64decode(body['jpnLatent']))
 
     # Style mixing
-    mixed_images = mix_styles(wst_latent, jpn_latent)
-    # mixed_images = tgg.mix_styles(wst_latent, jpn_latent)
+    # mixed_images = mix_styles(wst_latent, jpn_latent)
+    with graph.as_default():
+        mixed_images = tgg.mix_styles(wst_latent, jpn_latent)
 
     return jsonify(list(map(img_to_base64, mixed_images)))
 
-
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run()
