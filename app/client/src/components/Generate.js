@@ -9,7 +9,7 @@ class Generate extends React.Component {
 
     state = {
         japaneseGeneratedImages: [],
-        westernGeneratedImages: []
+        westernGeneratedImages: [],
     }
 
     fetchGeneratedImages(style) {
@@ -56,6 +56,9 @@ class Generate extends React.Component {
     }
 
     handleRefreshButtonClick = (style) => {
+        const newState = _cloneDeep(this.state);
+        newState[`${style}GeneratedImages`] = [];
+        this.setState(newState);
         this.fetchGeneratedImages(style);
     }
 
@@ -66,7 +69,7 @@ class Generate extends React.Component {
                 <Grid container spacing={10} justify='center' alignItems='center'>
                     <Grid item xs={6}>
                         <Typography variant="h5" display='inline' gutterBottom>Japanese styles</Typography>
-                        <IconButton onClick={() => this.handleRefreshButtonClick('japanese')} ><RefreshIcon /></IconButton>
+                        <IconButton onClick={() => this.handleRefreshButtonClick('japanese')} ><RefreshIcon /></IconButton><br />
                         {this.state.japaneseGeneratedImages.length === 0 ? <CircularProgress /> :
                             <GeneratedImageList
                                 generatedImages={this.state.japaneseGeneratedImages}
@@ -74,8 +77,8 @@ class Generate extends React.Component {
                             />}
                         <Box m={3} />
                         <Typography variant="h5" display='inline' gutterBottom>Western styles</Typography>
-                        <IconButton onClick={() => this.handleRefreshButtonClick('western')}><RefreshIcon /></IconButton>
-                        {this.state.japaneseGeneratedImages.length === 0 ? <CircularProgress /> :
+                        <IconButton onClick={() => this.handleRefreshButtonClick('western')}><RefreshIcon /></IconButton><br />
+                        {this.state.westernGeneratedImages.length === 0 ? <CircularProgress /> :
                             <GeneratedImageList
                                 generatedImages={this.state.westernGeneratedImages}
                                 handleImageClick={this.handleWesternImageClick}
