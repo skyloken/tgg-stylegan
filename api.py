@@ -12,7 +12,7 @@ from service import TakedaGoichiGenerator
 def generate_figure():
     """mock"""
     latent = np.random.randn(512)
-    image = Image.new("RGB", (256, 256), (0, 0, 256))
+    image = Image.new("RGB", (256, 256), (256, 0, 256))
 
     return latent, image
 
@@ -48,21 +48,22 @@ def generate():
         latent, image = generate_figure()
         # latent, image = tgg.generate_figure()
         generated_images.append({
-            'latent': str(latent.tolist()),
+            'latent': base64.b64encode(latent.tobytes()).decode('utf-8'),
             'base64': img_to_base64(image)
         })
 
     return jsonify(generated_images)
 
 
-@app.route('/mix')
+@app.route('/mix', methods=['POST'])
 def style_mix():
-    latent1 = request.args.get('latent1')
-    latent2 = request.args.get('latent2')
+    body = request.get_json()
+    wst_latent = np.frombuffer(base64.b64decode(body['wstLatent']))
+    jpn_latent = np.frombuffer(base64.b64decode(body['jpnLatent']))
 
     # Style mixing
-    mixed_images = mix_styles(latent1, latent2)
-    # mixed_images = tgg.mix_styles(latent1, latent2)
+    mixed_images = mix_styles(wst_latent, jpn_latent)
+    # mixed_images = tgg.mix_styles(wst_latent, jpn_latent)
 
     return jsonify(list(map(img_to_base64, mixed_images)))
 

@@ -1,7 +1,7 @@
 import React from 'react';
-
-import Tilt from 'react-tilt'
+import Tilt from 'react-tilt';
 import Image from './Image';
+
 
 const GeneratedImage = (props) => {
 

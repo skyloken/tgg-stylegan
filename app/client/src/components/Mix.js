@@ -11,17 +11,33 @@ class Mix extends React.Component {
         mix_index: 15
     }
 
-    componentWillMount() {
-        const params = new URLSearchParams({
-            'latent1': 'hoge',
-            'latent2': 'fuga'
-        });
+    fetchMixedImages() {
+        const body = {
+            'wstLatent': this.props.wstLatent,
+            'jpnLatent': this.props.jpnLatent
+        };
 
-        fetch(`/mix?${params}`)
+        fetch('/mix', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json; charset=utf-8',
+            },
+            body: JSON.stringify(body)
+        })
             .then(response => response.json())
             .then(data => this.setState({
                 mixedImages: data
             }));
+    }
+
+    componentDidMount() {
+        this.fetchMixedImages();
+    }
+
+    componentDidUpdate(prevProps) {
+        if (this.props.jpnLatent !== prevProps.jpnLatent || this.props.wstLatent !== prevProps.wstLatent) {
+            this.fetchMixedImages();
+        }
     }
 
     handleSliderChange = (event, newValue) => {
