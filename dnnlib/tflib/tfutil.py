@@ -116,7 +116,7 @@ def init_tf(config_dict: dict = None) -> None:
             os.environ[fields[1]] = str(value)
 
     # Create default TensorFlow session.
-    create_session(cfg, force_as_default=True)
+    return create_session(cfg, force_as_default=True)
 
 
 def assert_tf_initialized():
